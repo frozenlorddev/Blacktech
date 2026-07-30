@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blacktech - WhatsApp Pairing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a2e;
+      --bg-input: #0f0f1a;
+      --accent: #6c5ce7;
+      --accent-hover: #7c6cf7;
+      --accent-glow: rgba(108, 92, 231, 0.3);
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888a0;
+      --text-muted: #555570;
+      --success: #00b894;
+      --error: #e17055;
+      --border: #2a2a40;
+      --border-focus: #6c5ce7;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Animated background */
+    .bg-effects {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .bg-effects::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at 30% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                  radial-gradient(ellipse at 70% 50%, rgba(0, 184, 148, 0.05) 0%, transparent 50%);
+      animation: bgShift 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(-5%, -3%); }
+    }
+
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(108, 92, 231, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108, 92, 231, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 460px;
+      padding: 20px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 36px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 80px var(--accent-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .logo-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 8px 24px rgba(108, 92, 231, 0.4);
+    }
+
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff, #c4b5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-prefix {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 500;
+      pointer-events: none;
+    }
+
+    input[type="tel"] {
+      width: 100%;
+      padding: 14px 16px 14px 42px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 16px;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    input[type="tel"]:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    input[type="tel"]::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #7c6cf7);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(108, 92, 231, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(108, 92, 231, 0.5);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      margin-top: 12px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      background: rgba(108, 92, 231, 0.1);
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .result-panel {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .result-panel.visible {
+      display: block;
+    }
+
+    .pairing-code {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: var(--accent);
+      background: var(--bg-input);
+      border: 2px dashed var(--accent);
+      border-radius: 16px;
+      padding: 20px;
+      margin: 16px 0;
+      font-family: 'Inter', monospace;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pairing-code:hover {
+      border-color: var(--accent-hover);
+      background: rgba(108, 92, 231, 0.08);
+    }
+
+    .pairing-code .copy-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    .instructions {
+      text-align: left;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .instructions h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .step:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      background: rgba(108, 92, 231, 0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .step p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .status-message {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .status-message.error {
+      display: block;
+      background: rgba(225, 112, 85, 0.1);
+      border: 1px solid rgba(225, 112, 85, 0.3);
+      color: var(--error);
+    }
+
+    .status-message.success {
+      display: block;
+      background: rgba(0, 184, 148, 0.1);
+      border: 1px solid rgba(0, 184, 148, 0.3);
+      color: var(--success);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-card);
+      border: 1px solid var(--accent);
+      color: var(--text-primary);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 100;
+      transition: transform 0.3s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 480px) {
+      .card {
+        padding: 30px 24px;
+      }
+      .pairing-code {
+        font-size: 28px;
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-effects"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="container">
+    <div class="card">
+      <!-- Logo -->
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+        </div>
+        <h1>Blacktech</h1>
+        <p>WhatsApp Device Pairing</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Input Form -->
+      <div id="formSection">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">+</span>
+            <input
+              type="tel"
+              id="phoneInput"
+              placeholder="254704955033"
+              autocomplete="off"
+              maxlength="15"
+            />
+          </div>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <button class="btn btn-primary" id="pairBtn" onclick="requestPairing()">
+          <span id="btnText">Get Pairing Code</span>
+        </button>
+      </div>
+
+      <!-- Result Panel -->
+      <div id="resultPanel" class="result-panel">
+        <p style="color: var(--text-secondary); font-size: 14px;">Your pairing code:</p>
+        <div class="pairing-code" id="pairingCode" onclick="copyCode()">
+          <span id="codeText">-</span>
+          <div class="copy-hint">Click to copy</div>
+        </div>
+
+        <div class="instructions">
+          <h3>How to pair</h3>
+          <div class="step">
+            <div class="step-num">1</div>
+            <p>Open <strong>WhatsApp</strong> on your phone</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <p>Go to <strong>Linked Devices</strong> &rarr; <strong>Link a device</strong></p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <p>Tap <strong>&ldquo;Link with phone number&rdquo;</strong></p>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <p>Enter the <strong>8-digit code</strong> shown above</p>
+          </div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="resetForm()">
+          Pair Another Number
+        </button>
+      </div>
+    </div>
+
+    <div class="footer">
+      Powered by <a href="https://github.com/frozenlorddev/Blacktech" target="_blank">Blacktech</a>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast">Code copied to clipboard!</div>
+
+  <script>
+    // Replace with your bot server URL (e.g., Railway/Render URL)
+    const API_BASE = 'https://your-bot-server.onrender.com';
+
+    async function requestPairing() {
+      const phone = document.getElementById('phoneInput').value.replace(/\D/g, '');
+      const btn = document.getElementById('pairBtn');
+      const btnText = document.getElementById('btnText');
+      const status = document.getElementById('statusMessage');
+
+      if (phone.length < 7) {
+        status.className = 'status-message error';
+        status.textContent = 'Please enter a valid phone number (at least 7 digits)';
+        return;
+      }
+
+      // Hide previous errors
+      status.className = 'status-message';
+      status.style.display = 'none';
+
+      // Show loading
+      btn.disabled = true;
+      btnText.innerHTML = '<div class="spinner"></div> Generating code...';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/pair`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to generate pairing code');
+        }
+
+        // Show result
+        document.getElementById('formSection').style.display = 'none';
+        document.getElementById('resultPanel').classList.add('visible');
+        document.getElementById('codeText').textContent = data.code;
+
+      } catch (err) {
+        status.className = 'status-message error';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Get Pairing Code';
+      }
+    }
+
+    function resetForm() {
+      document.getElementById('formSection').style.display = 'block';
+      document.getElementById('resultPanel').classList.remove('visible');
+      document.getElementById('phoneInput').value = '';
+      document.getElementById('statusMessage').style.display = 'none';
+    }
+
+    function copyCode() {
+      const code = document.getElementById('codeText').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
+      }).catch(() => {
+        // Fallback for older browsers
+        const el = document.createElement('textarea');
+        el.value = code;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
+      });
+    }
+
+    // Allow Enter key to submit
+    document.getElementById('phoneInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') requestPairing();
+    });
+  </script>
+</body>
+</html>

@@ -175,7 +175,7 @@ const TRANSLATIONS = {
 ╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
 
 ╭━━•›〘 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 〙•━•
-│⌬ /pair <number>
+│⌬ /pair (web pairing)
 │⌬ /delpair <number>
 │⌬ /listpaired
 │⌬ /buypanel
@@ -209,7 +209,7 @@ const TRANSLATIONS = {
 ╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
 
 ╭━━•›〘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦 〙•━•
-│⌬ /pair <número>
+│⌬ /pair (emparejamiento web)
 │⌬ /delpair <número>
 │⌬ /listpaired
 │⌬ /buypanel
@@ -991,6 +991,60 @@ app.post('/api/create-panel', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+//   WEB PAIRING API (Vercel Frontend → Bot Server)
+// ─────────────────────────────────────────────────────────────
+
+// ── /api/pair — Generate WhatsApp pairing code via phone number ──
+app.post('/api/pair', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone || phone.length < 7) {
+    return res.status(400).json({ error: 'Please enter a valid phone number (at least 7 digits)' });
+  }
+  const cleanPhone = String(phone).replace(/\D/g, '');
+  const uid = 'web_' + cleanPhone;
+  const sessionId = `wa_${uid}_${cleanPhone}`;
+
+  if (activeSockets.has(sessionId)) {
+    return res.status(409).json({ error: `+${cleanPhone} is already connected!` });
+  }
+
+  if (sessionExists(sessionId)) {
+    // Reconnect existing session — no pairing code needed
+    startWhatsApp(sessionId, null, null, uid).catch(e => logError('WEB-PAIR', e.message));
+    return res.json({ code: 'RECONNECTED', message: `+${cleanPhone} session restored.`, reconnected: true });
+  }
+
+  try {
+    const code = await new Promise((resolve, reject) => {
+      startWhatsApp(sessionId, null, cleanPhone, uid, (generatedCode) => {
+        resolve(generatedCode);
+      }).catch(reject);
+    });
+    // Update the pair record
+    addPair(uid, sessionId, cleanPhone);
+    logSuccess('WEB-PAIR', `Code generated for +${cleanPhone}`);
+    return res.json({ code, phone: cleanPhone });
+  } catch (e) {
+    logError('WEB-PAIR', `Pairing failed for +${cleanPhone}: ${e.message}`);
+    return res.status(500).json({ error: `Pairing failed: ${e.message}` });
+  }
+});
+
+// ── /api/status — Check pairing status for a number ──
+app.get('/api/status/:phone', (req, res) => {
+  const cleanPhone = req.params.phone.replace(/\D/g, '');
+  const uid = 'web_' + cleanPhone;
+  const sessionId = `wa_${uid}_${cleanPhone}`;
+  const isActive = activeSockets.has(sessionId);
+  return res.json({ phone: cleanPhone, connected: isActive, sessionId });
+});
+
+// ── /api/pairing-url — Get the Vercel pairing page URL ──
+app.get('/api/pairing-url', (req, res) => {
+  return res.json({ url: process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app' });
+});
+
 app.listen(3002, () => console.log('Webhook API on :3002'));
 
 // ─────────────────────────────────────────────────────────────
@@ -1168,7 +1222,10 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
         deleteSessionFromGitHub(sessionId).catch(() => {});
         if (telegramChatId) {
           const mainBot = global._mainBotInstance;
-          if (mainBot) mainBot.telegram.sendMessage(telegramChatId, `🚪 +${sock.__waNum||pairPhone} logged out & session deleted.\nUse /pair to reconnect.`).catch(()=>{});
+          if (mainBot) {
+        const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
+        mainBot.telegram.sendMessage(telegramChatId, `🚪 +${sock.__waNum||pairPhone} logged out & session deleted.\nUse the web page to reconnect:\n🔗 ${pairingUrl}`).catch(()=>{});
+      }
         }
       } else {
         logWarn(sessionId, 'Reconnecting...');
@@ -1657,34 +1714,28 @@ function setupBot(botInstance, options = {}) {
   });
 
   // ─────────────────────────────────────────────────────────────
-  //   PAIRING CALLBACKS
+  //   PAIRING CALLBACKS → redirect to web
   // ─────────────────────────────────────────────────────────────
   botInstance.action('pair_new', async (ctx) => {
     await ctx.answerCbQuery();
-    const userId = String(ctx.from.id);
-    localStates.set(userId, { action: 'pair' });
+    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
     await ctx.editMessageText(
-      '📱 *Enter phone number to pair:*\n\nFormat: `254700000000` (without +)',
+      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\n\n🔗 [Open Pairing Page](${pairingUrl})\n\nSimply visit the link and enter your phone number to get a pairing code!`,
       { parse_mode: 'Markdown' }
     );
   });
 
   botInstance.action('pair_existing', async (ctx) => {
     await ctx.answerCbQuery();
-    const userId = String(ctx.from.id);
-    localStates.set(userId, { action: 'restore_session' });
     await ctx.editMessageText(
-      '📂 *Enter your Session ID:*\n\n' +
-      'You can find it in your paired list or in the `sessions/` folder.\n' +
-      'Example: `wa_123456789_254700000000`\n\n' +
-      'Type /cancel to abort.',
+      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\n\n🔗 [Open Pairing Page](${process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app'})\n\nExisting sessions are automatically detected and reconnected!`,
       { parse_mode: 'Markdown' }
     );
   });
 
   botInstance.action('pair_cancel', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.editMessageText('❌ Pairing cancelled.');
+    await ctx.editMessageText('❌ Pairing cancelled. Visit the web page anytime to pair.');
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -1695,30 +1746,17 @@ function setupBot(botInstance, options = {}) {
   botInstance.command('pair', async (ctx) => {
     registerUser(ctx.from.id, ctx.from.first_name);
     const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
-    if (!phone || phone.length < 7) {
-      return ctx.reply('Usage: `/pair 254704955033`', { parse_mode: 'Markdown' });
-    }
-    const uid = String(ctx.from.id);
-    const sessionId = `wa_${uid}_${phone}`;
-
-    if (activeSockets.has(sessionId)) {
-      return ctx.reply(`✅ +${phone} already connected!`);
-    }
-
-    if (sessionExists(sessionId)) {
-      await ctx.reply(`♻️ Reconnecting +${phone}...`);
-      await startWhatsApp(sessionId, ctx.chat.id, null, uid);
-      return;
-    }
-
-    await ctx.reply(`🔄 Pairing *+${phone}*...`, { parse_mode: 'Markdown' });
-    await startWhatsApp(sessionId, ctx.chat.id, phone, uid);
+    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
+    return ctx.reply(
+      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\nVisit the link below and enter your phone number to get a pairing code.\n\n🔗 [Pair Your WhatsApp](${pairingUrl})\n\nJust visit the link and follow the instructions on the page!`,
+      { parse_mode: 'Markdown' }
+    );
   });
 
   // ── /delpair ──
   botInstance.command('delpair', async (ctx) => {
     const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
-    if (!phone) return ctx.reply('Usage: /delpair 254704955033');
+    if (!phone) return ctx.reply('Usage: /delpair 254704955033\n\nOr manage your pairs on the web: https://your-pairing-site.vercel.app');
     const uid = String(ctx.from.id);
     const sessionId = `wa_${uid}_${phone}`;
     const sock = activeSockets.get(sessionId);
@@ -1743,7 +1781,8 @@ function setupBot(botInstance, options = {}) {
   // ── /listpaired ──
   botInstance.command('listpaired', async (ctx) => {
     const pairs = getUserPairs(String(ctx.from.id));
-    if (!pairs.length) return ctx.reply('No paired numbers. Use /pair <number>');
+    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
+    if (!pairs.length) return ctx.reply(`No paired numbers. Visit the web to pair:\n🔗 [Pair Now](${pairingUrl})`);
     const list = pairs.map((p, i) => {
       const status = activeSockets.has(p.sessionId) ? '🟢' : '🔴';
       return `${i+1}. +${p.waNum} - Session: \`${p.sessionId}\` ${status}`;
@@ -2636,18 +2675,12 @@ function setupBot(botInstance, options = {}) {
 
     // ── Keyboard buttons ──
 
-    // Row 1: Pair
+    // Row 1: Pair — redirect to web
     if (text === '𝑷𝑨𝑰𝑹 𝑺𝑨𝑴𝑺𝑼𝑵𝑮 𝑴𝑫 𝑷𝑹𝑬𝑴𝑰𝑼𝑴') {
+      const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
       await ctx.reply(
-        '🔐 *Pairing Options*\n\nChoose how you want to proceed:',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('📱 Pair New Device', 'pair_new')],
-            [Markup.button.callback('📂 Use Existing Session ID', 'pair_existing')],
-            [Markup.button.callback('❌ Cancel', 'pair_cancel')]
-          ])
-        }
+        `🌐 *Web Pairing*\n\nPair your WhatsApp device through our web page.\nIt's fast, easy, and works from any browser.\n\n🔗 [Open Pairing Page](${pairingUrl})\n\nSimply visit the link and enter your phone number to get a pairing code!`,
+        { parse_mode: 'Markdown' }
       );
       return;
     }
@@ -2679,8 +2712,12 @@ function setupBot(botInstance, options = {}) {
 
     // Row 5: Del Pair & Refresh
     if (text === '𝑫𝑬𝑳 𝑷𝑨𝑰𝑹') {
+      const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
       localStates.set(userId, { action: 'delpair' });
-      await ctx.reply('🗑️ *Enter phone number to delete:*\n\nFormat: `254700000000`', { parse_mode: 'Markdown' });
+      await ctx.reply(
+        `🗑️ *Enter phone number to delete:*\n\nFormat: \`254700000000\`\n\nOr manage your pairs on the web:\n🔗 [Web Pairing](${pairingUrl})`,
+        { parse_mode: 'Markdown' }
+      );
       return;
     }
 
