@@ -1,7 +1,8 @@
 // ============================================================
 //   SAMSUNG XMD  –  COMPLETE INDEX (ALL-IN-ONE)
-//   Full integration: language, keyboard, bulk, AI, webhook
-//   ============================================================
+//   All features integrated – English only – No GetKey
+//   Clone bot: public | Keyboard: 2‑column | Links: owner only
+// ============================================================
 'use strict';
 require('dotenv').config();
 
@@ -21,8 +22,6 @@ const AdmZip = require('adm-zip');
 const { exec } = require('child_process');
 const vm = require('vm');
 const jsBeautify = require('js-beautify');
-const { OpenAI } = require('openai');
-const express = require('express');
 
 const {
   default: makeWASocket,
@@ -64,13 +63,6 @@ let db = {
   links: {},
   pesapal: {},
   fileStore: [],
-  prices: {
-    panel: { '1gb': 1000, '2gb': 2000, '3gb': 3000, '4gb': 4000, 'unlimited': 8000, 'cpanel': 10000 },
-    vps: { '1gb': 5000, '2gb': 10000, '4gb': 20000, '8gb': 40000 },
-    currency: 'KES',
-  },
-  customCommands: {},
-  bannedUsers: [],
 };
 
 function loadDb() {
@@ -103,154 +95,10 @@ function ensureUser(userId) {
       referredBy: null,
       premium: false,
       registeredAt: new Date().toISOString(),
-      language: 'en',
-      panels: [],
     };
-    saveDb();
-  } else if (!db.users[userId].language) {
-    db.users[userId].language = 'en';
-    saveDb();
-  } else if (!db.users[userId].panels) {
-    db.users[userId].panels = [];
     saveDb();
   }
 }
-
-// ─────────────────────────────────────────────────────────────
-//   PREMIUM SYSTEM
-// ─────────────────────────────────────────────────────────────
-
-const PREMIUM_FILE = './database/prem_data.json';
-function loadJSON(file, def) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; }
-}
-function saveJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
-const _rp = loadJSON(PREMIUM_FILE, {});
-let premData = {
-  premOnly: !!_rp.premOnly,
-  owners: Array.isArray(_rp.owners) ? _rp.owners : [],
-  premUsers: Array.isArray(_rp.premUsers) ? _rp.premUsers : [],
-};
-function savePrem() { saveJSON(PREMIUM_FILE, premData); }
-
-function isOwner(id) {
-  return String(id) === String(settings.OWNER_TELEGRAM_ID) || premData.owners.includes(String(id));
-}
-function isPremium(id) {
-  return isOwner(id) || premData.premUsers.includes(String(id)) || (db.users[id] && db.users[id].premium);
-}
-function canUseBot(id) {
-  if (db.bannedUsers && db.bannedUsers.includes(String(id))) return false;
-  if (!premData.premOnly) return true;
-  return isPremium(id);
-}
-
-// ─────────────────────────────────────────────────────────────
-//   LANGUAGE DEFINITIONS
-// ─────────────────────────────────────────────────────────────
-
-const SUPPORTED_LANGUAGES = [
-  { code: 'en', name: 'English 🇬🇧' },
-  { code: 'es', name: 'Español 🇪🇸' },
-  { code: 'pt', name: 'Português 🇵🇹' },
-  { code: 'fr', name: 'Français 🇫🇷' },
-  { code: 'ar', name: 'العربية 🇸🇦' },
-];
-
-const TRANSLATIONS = {
-  en: {
-    welcome: `
-  •━═〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙═━•
-
-╭═━⪩ 〘 SYSTEM INFO 〙•━•
-│⫹⫺ 𝗕𝗢𝗧:〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙
-│⫹⫺ 𝗗𝗘𝗩: 𝑼𝒍𝒕𝒓𝒂 𝒊𝒏𝒇𝒊𝒏𝒊𝒕𝒚
-│⫹⫺ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡: 𝐕𝐈𝐒𝐈𝐎𝐍 𝟐.𝟎
-│⫹⫺ 𝗠𝗢𝗗𝗘: public
-│⫹⫺ 𝗣𝗟𝗔𝗧𝗙𝗢𝗥𝗠: 𝒍𝒊𝒏𝒖𝒙
-│⫹⫺ 𝗨𝗣𝗧𝗜𝗠𝗘: ${formatUptime(Date.now() - global.botStartTime)}
-│⫹⫺ 𝗢𝗪𝗡𝗘𝗥: ⃝⃪ 𝑺𝒂𝒎𝒔𝒖𝒏𝒈 
-╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
-
-╭━━•›〘 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 〙•━•
-│⌬ /pair (web pairing)
-│⌬ /delpair <number>
-│⌬ /listpaired
-│⌬ /buypanel
-│⌬ /cpanel <username>
-│⌬ /verifypayment [reference]
-│⌬ /adminpanel (owner)
-│⌬ /reportissue <msg>
-│⌬ /broadcast (owner)
-│⌬ /listprem (owner)
-│⌬ /cvps (create VPS)
-│⌬ /installpanel (panel installer)
-│⌬ /pesapal <amount> [desc]
-╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
-
-⌬ 〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙`,
-    languagePrompt: '🌐 *Please select your language:*',
-    languageSet: '✅ Language set to *{lang}*.',
-  },
-  es: {
-    welcome: `
-  •━═〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙═━•
-
-╭═━⪩ 〘 INFORMACIÓN DEL SISTEMA 〙•━•
-│⫹⫺ 𝗕𝗢𝗧:〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙
-│⫹⫺ 𝗗𝗘𝗩: 𝑼𝒍𝒕𝒓𝒂 𝒊𝒏𝒇𝒊𝒏𝒊𝒕𝒚
-│⫹⫺ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡: 𝐕𝐈𝐒𝐈𝐎𝐍 𝟐.𝟎
-│⫹⫺ 𝗠𝗢𝗗𝗢: público
-│⫹⫺ 𝗣𝗟𝗔𝗧𝗔𝗙𝗢𝗥𝗠𝗔: 𝒍𝒊𝒏𝒖𝒙
-│⫹⫺ 𝗧𝗜𝗘𝗠𝗣𝗢 𝗔𝗖𝗧𝗜𝗩𝗢: ${formatUptime(Date.now() - global.botStartTime)}
-│⫹⫺ 𝗣𝗥𝗢𝗣𝗜𝗘𝗧𝗔𝗥𝗜𝗢: ⃝⃪ 𝑺𝒂𝒎𝒔𝒖𝒏𝒈 
-╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
-
-╭━━•›〘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦 〙•━•
-│⌬ /pair (emparejamiento web)
-│⌬ /delpair <número>
-│⌬ /listpaired
-│⌬ /buypanel
-│⌬ /cpanel <usuario>
-│⌬ /verifypayment [referencia]
-│⌬ /adminpanel (propietario)
-│⌬ /reportissue <msg>
-│⌬ /broadcast (propietario)
-│⌬ /listprem (propietario)
-│⌬ /cvps (crear VPS)
-│⌬ /installpanel (instalador)
-│⌬ /pesapal <monto> [desc]
-╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
-
-⌬ 〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙`,
-    languagePrompt: '🌐 *Selecciona tu idioma:*',
-    languageSet: '✅ Idioma establecido a *{lang}*.',
-  },
-  // Add other languages similarly...
-};
-
-// ─────────────────────────────────────────────────────────────
-//   PENDING REPLIES & STATES
-// ─────────────────────────────────────────────────────────────
-
-const PENDING_FILE  = './database/pendingReplies.json';
-let pendingRepliesData = loadJSON(PENDING_FILE, {});
-const pendingReplies = new Map(Object.entries(pendingRepliesData));
-function savePendingReplies() {
-  saveJSON(PENDING_FILE, Object.fromEntries(pendingReplies));
-}
-
-// ─────────────────────────────────────────────────────────────
-//   ACTIVE SOCKETS & CLONED BOTS
-// ─────────────────────────────────────────────────────────────
-
-const activeSockets = new Map();
-const notifiedConnected = new Set();
-global._activeSockets = activeSockets;
-const clonedBots = new Map();
-global.clonedBots = clonedBots;
 
 // ─────────────────────────────────────────────────────────────
 //   PAYSTACK HELPERS
@@ -299,18 +147,7 @@ async function verifyPaystackPayment(reference) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   PESAPAL (stored in db.pesapal)
-// ─────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────
-//   PENDING PAYMENTS STORE
-// ─────────────────────────────────────────────────────────────
-
-const pendingPayments = new Map();
-global.pendingPayments = pendingPayments;
-
-// ─────────────────────────────────────────────────────────────
-//   PTERODACTYL PANEL CREATION (with user reuse)
+//   PANEL CREATION (PTERODACTYL)
 // ─────────────────────────────────────────────────────────────
 
 const PANEL_DOMAIN = process.env.PANEL_DOMAIN || settings.PANEL_DOMAIN || 'https://sky.blacklord.tech';
@@ -326,53 +163,31 @@ function generatePassword(username) {
   return first + rest + digits + '!';
 }
 
-async function findPterodactylUser(username) {
+async function createPterodactylPanel(username, ramMB, diskMB, cpuPercent, isAdmin = false) {
+  const email = `${username}@gmail.com`;
+  const password = generatePassword(username);
+
+  let userId;
   try {
-    const response = await axios.get(
-      `${PANEL_DOMAIN}/api/application/users?filter[email]=${username}@gmail.com`,
+    const userRes = await axios.post(
+      `${PANEL_DOMAIN}/api/application/users`,
       {
-        headers: { Authorization: `Bearer ${PANEL_APIKEY}` },
-        timeout: 10000,
+        email,
+        username,
+        first_name: username,
+        last_name: isAdmin ? 'Admin' : 'Panel',
+        root_admin: isAdmin,
+        language: 'en',
+        password,
+      },
+      {
+        headers: { Authorization: `Bearer ${PANEL_APIKEY}`, 'Content-Type': 'application/json' },
+        timeout: 15000,
       }
     );
-    const users = response.data.data;
-    if (users && users.length > 0) {
-      return users[0].attributes.id;
-    }
-    return null;
+    userId = userRes.data.attributes.id;
   } catch (e) {
-    return null;
-  }
-}
-
-async function createPterodactylPanel(username, ramMB, diskMB, cpuPercent, isAdmin = false, existingUserId = null) {
-  let userId, userPassword = null;
-
-  if (existingUserId) {
-    userId = existingUserId;
-  } else {
-    userPassword = generatePassword(username);
-    try {
-      const userRes = await axios.post(
-        `${PANEL_DOMAIN}/api/application/users`,
-        {
-          email: `${username}@gmail.com`,
-          username,
-          first_name: username,
-          last_name: isAdmin ? 'Admin' : 'Panel',
-          root_admin: isAdmin,
-          language: 'en',
-          password: userPassword,
-        },
-        {
-          headers: { Authorization: `Bearer ${PANEL_APIKEY}`, 'Content-Type': 'application/json' },
-          timeout: 15000,
-        }
-      );
-      userId = userRes.data.attributes.id;
-    } catch (e) {
-      throw new Error(`User creation failed: ${e.response?.data?.errors?.[0]?.detail || e.message}`);
-    }
+    throw new Error(`User creation failed: ${e.response?.data?.errors?.[0]?.detail || e.message}`);
   }
 
   let allocId;
@@ -424,7 +239,7 @@ async function createPterodactylPanel(username, ramMB, diskMB, cpuPercent, isAdm
 
   try {
     const serverData = {
-      name: `${username}-${isAdmin ? 'admin' : 'panel'}-${Date.now().toString().slice(-4)}`,
+      name: `${username}-${isAdmin ? 'admin' : 'panel'}`,
       user: userId,
       egg: PANEL_EGG,
       docker_image: eggDetails.docker_image || 'ghcr.io/parkervcp/yolks:nodejs_18',
@@ -450,14 +265,13 @@ async function createPterodactylPanel(username, ramMB, diskMB, cpuPercent, isAdm
     return {
       success: true,
       username,
-      password: userPassword,
+      password,
       panelDomain: PANEL_DOMAIN,
       serverId: srvRes.data.attributes.id,
       ram: ramMB,
       disk: diskMB,
       cpu: cpuPercent,
       isAdmin,
-      reused: !!existingUserId,
     };
   } catch (e) {
     const errorMsg = e.response?.data?.errors?.[0]?.detail || e.message;
@@ -466,7 +280,237 @@ async function createPterodactylPanel(username, ramMB, diskMB, cpuPercent, isAdm
 }
 
 // ─────────────────────────────────────────────────────────────
-//   DIGITALOCEAN VPS HELPERS
+//   PENDING PAYMENTS STORE
+// ─────────────────────────────────────────────────────────────
+
+const pendingPayments = new Map();
+global.pendingPayments = pendingPayments;
+
+// ─────────────────────────────────────────────────────────────
+//   PERSISTENT PENDING REPLIES
+// ─────────────────────────────────────────────────────────────
+
+const PENDING_FILE  = './database/pendingReplies.json';
+const PREMIUM_FILE  = './database/prem_data.json';
+
+function loadJSON(file, def) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; }
+}
+function saveJSON(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+let pendingRepliesData = loadJSON(PENDING_FILE, {});
+const pendingReplies   = new Map(Object.entries(pendingRepliesData));
+
+function savePendingReplies() {
+  saveJSON(PENDING_FILE, Object.fromEntries(pendingReplies));
+}
+
+// ─────────────────────────────────────────────────────────────
+//   PREMIUM SYSTEM
+// ─────────────────────────────────────────────────────────────
+
+const _rp = loadJSON(PREMIUM_FILE, {});
+let premData = {
+  premOnly: !!_rp.premOnly,
+  owners: Array.isArray(_rp.owners) ? _rp.owners : [],
+  premUsers: Array.isArray(_rp.premUsers) ? _rp.premUsers : [],
+};
+
+function savePrem() { saveJSON(PREMIUM_FILE, premData); }
+
+function isOwner(id) {
+  return String(id) === String(settings.OWNER_TELEGRAM_ID) || premData.owners.includes(String(id));
+}
+function isPremium(id) {
+  return isOwner(id) || premData.premUsers.includes(String(id)) || (db.users[id] && db.users[id].premium);
+}
+function canUseBot(id) {
+  if (!premData.premOnly) return true;
+  return isPremium(id);
+}
+
+// ─────────────────────────────────────────────────────────────
+//   ACTIVE SOCKETS
+// ─────────────────────────────────────────────────────────────
+
+const activeSockets      = new Map();
+const notifiedConnected  = new Set();
+global._activeSockets    = activeSockets;
+
+// ─────────────────────────────────────────────────────────────
+//   GITHUB SESSION SYNC
+// ─────────────────────────────────────────────────────────────
+
+const GH_TOKEN  = settings.GITHUB_TOKEN  || process.env.GITHUB_TOKEN;
+const GH_USER   = settings.GITHUB_USERNAME || process.env.GITHUB_USERNAME;
+const GH_REPO   = settings.GITHUB_REPO   || process.env.GITHUB_REPO;
+const GH_BRANCH = settings.GITHUB_BRANCH || process.env.GITHUB_BRANCH || 'main';
+
+function ghRequest(method, urlPath, body = null) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const opts = {
+      hostname: 'api.github.com',
+      path: `/repos/${GH_USER}/${GH_REPO}/contents/${urlPath}?ref=${GH_BRANCH}`,
+      method,
+      headers: {
+        'Authorization': `Bearer ${GH_TOKEN}`,
+        'User-Agent': 'Samsung-MD',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}),
+      },
+    };
+    const req = https.request(opts, (res) => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); }
+        catch { resolve({ status: res.statusCode, body: raw }); }
+      });
+    });
+    req.on('error', reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+async function ghListDir(remotePath) {
+  const { status, body } = await ghRequest('GET', remotePath);
+  if (status !== 200 || !Array.isArray(body)) return [];
+  return body;
+}
+
+async function ghGetFile(remotePath) {
+  const { status, body } = await ghRequest('GET', remotePath);
+  if (status !== 200 || !body.content) return null;
+  return { content: Buffer.from(body.content.replace(/\n/g, ''), 'base64'), sha: body.sha };
+}
+
+async function ghDeleteFile(remotePath, sha, message) {
+  return ghRequest('DELETE', remotePath, { message, sha });
+}
+
+async function downloadSessionFromGitHub(sessionId) {
+  try {
+    const remotePath = `sessions/${sessionId}`;
+    const files = await ghListDir(remotePath);
+    if (!files.length) return false;
+    const localDir = sessionDir(sessionId);
+    ensureDir(localDir);
+    for (const f of files) {
+      if (f.type !== 'file') continue;
+      const fileData = await ghGetFile(`${remotePath}/${f.name}`);
+      if (!fileData) continue;
+      fs.writeFileSync(path.join(localDir, f.name), fileData.content);
+      logInfo('GH-SYNC', `Downloaded: ${sessionId}/${f.name}`);
+    }
+    return true;
+  } catch (e) {
+    logError('GH-SYNC', `Download failed for ${sessionId}: ${e.message}`);
+    return false;
+  }
+}
+
+async function deleteSessionFromGitHub(sessionId) {
+  try {
+    const files = await ghListDir(`sessions/${sessionId}`);
+    for (const f of files) {
+      if (f.type === 'file') await ghDeleteFile(`sessions/${sessionId}/${f.name}`, f.sha, `Logout cleanup: ${sessionId}`);
+    }
+    logInfo('GH-SYNC', `Deleted from GitHub: ${sessionId}`);
+  } catch (e) {
+    logError('GH-SYNC', `GH delete failed for ${sessionId}: ${e.message}`);
+  }
+}
+
+async function syncSessionsFromGitHub() {
+  try {
+    const { status, body } = await ghRequest('GET', '');
+    if (status !== 200 || !Array.isArray(body)) return;
+    const sessionIds = new Set();
+    for (const item of body) {
+      const m = item.path.match(/^sessions\/([^\/]+)\/creds\.json$/);
+      if (m) sessionIds.add(m[1]);
+    }
+    if (!sessionIds.size) { logInfo('GH-SYNC', 'No remote sessions'); return; }
+    for (const sid of sessionIds) {
+      if (!sessionExists(sid)) {
+        logInfo('GH-SYNC', `Downloading: ${sid}`);
+        await downloadSessionFromGitHub(sid);
+      } else {
+        logInfo('GH-SYNC', `Already local: ${sid}`);
+      }
+    }
+  } catch (e) {
+    logError('GH-SYNC', `Sync error: ${e.message}`);
+  }
+}
+
+function startSessionWatcher() {
+  setInterval(async () => {
+    try {
+      const { status, body } = await ghRequest('GET', '');
+      if (status !== 200 || !Array.isArray(body)) return;
+      const sessionIds = new Set();
+      for (const item of body) {
+        const m = item.path.match(/^sessions\/([^\/]+)\/creds\.json$/);
+        if (m) sessionIds.add(m[1]);
+      }
+      for (const sid of sessionIds) {
+        if (activeSockets.has(sid)) continue;
+        if (!sessionExists(sid)) {
+          logInfo('WATCHER', `New session detected: ${sid}`);
+          await downloadSessionFromGitHub(sid);
+        }
+        if (sessionExists(sid) && !activeSockets.has(sid)) {
+          logInfo('WATCHER', `Starting: ${sid}`);
+          let tgUserId = null;
+          const allPairs = getAllPairs();
+          for (const [uid, pairs] of Object.entries(allPairs)) {
+            if (pairs.find(p => p.sessionId === sid)) { tgUserId = uid; break; }
+          }
+          notifiedConnected.add(sid);
+          startWhatsApp(sid, null, null, tgUserId).catch(e => logError('WATCHER', e.message));
+        }
+      }
+    } catch {}
+  }, 30000);
+  logSuccess('WATCHER', 'Live session watcher started (30s interval)');
+}
+
+// ─────────────────────────────────────────────────────────────
+//   SELF-PING
+// ─────────────────────────────────────────────────────────────
+
+function startPingLoop() {
+  const urls = [settings.PANEL_URL, settings.WEBSITE_URL].filter(Boolean);
+  http.createServer((req, res) => {
+    const uptime = formatUptime(Date.now() - global.botStartTime);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'alive', uptime, sessions: activeSockets.size }));
+  }).listen(process.env.PORT || 3001, () => {
+    logSuccess('PING', `Health server :${process.env.PORT || 3001}`);
+  });
+  setInterval(() => {
+    const uptime = formatUptime(Date.now() - global.botStartTime);
+    process.stdout.write(chalk.gray(`[UPTIME] ${uptime}\n`));
+    for (const url of urls) {
+      try {
+        const parsed = new URL(url);
+        const mod = parsed.protocol === 'https:' ? https : http;
+        const req = mod.get(url, res => logInfo('PING', `${url} → ${res.statusCode}`));
+        req.on('error', () => {});
+        req.setTimeout(8000, () => req.destroy());
+      } catch {}
+    }
+  }, 4 * 60 * 1000);
+}
+
+// ─────────────────────────────────────────────────────────────
+//   VPS HELPER FUNCTIONS (DigitalOcean)
 // ─────────────────────────────────────────────────────────────
 
 const DO_API_KEYS = [
@@ -602,20 +646,7 @@ function formatUptimeVPS(createdAt) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   VPS STORAGE (local JSON)
-// ─────────────────────────────────────────────────────────────
-
-const VPS_FILE = './database/vps_data.json';
-function loadVPS() { return fs.existsSync(VPS_FILE) ? JSON.parse(fs.readFileSync(VPS_FILE, 'utf8')) : {}; }
-function saveVPS(data) { fs.writeFileSync(VPS_FILE, JSON.stringify(data, null, 2)); }
-function addVPS(dropletId, info) {
-  const db = loadVPS();
-  db[dropletId] = info;
-  saveVPS(db);
-}
-
-// ─────────────────────────────────────────────────────────────
-//   SSH2 PANEL INSTALLATION
+//   SSH2 PANEL INSTALLATION HELPERS
 // ─────────────────────────────────────────────────────────────
 
 function installPanelViaSSH(ip, password, domainpanel, domainnode, ramserver) {
@@ -670,7 +701,7 @@ function installPanelViaSSH(ip, password, domainpanel, domainnode, ramserver) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   CLOUDFLARE SUBDOMAIN
+//   CLOUDFLARE SUBDOMAIN HELPERS
 // ─────────────────────────────────────────────────────────────
 
 global.subdomain = {
@@ -824,19 +855,44 @@ async function deleteDNSRecord(tldnya, recordId) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   ATLANTIC API (for withdrawal)
+//   ATLANTIC API HELPERS (for payment/withdraw)
 // ─────────────────────────────────────────────────────────────
 
 const atlanticApiKey = settings.apiAtlantic || process.env.ATLANTIC_API_KEY;
 
+async function generateCustomQRFromString(qrString) {
+  try {
+    const qrBuffer = await QRCode.toBuffer(qrString, { width: 300, margin: 2, color: { dark: '#000000', light: '#FFFFFF' } });
+    return qrBuffer;
+  } catch (error) {
+    throw error;
+  }
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
 // ─────────────────────────────────────────────────────────────
-//   FILE DEPLOYMENT TO VPS
+//   VPS STORAGE (local JSON)
+// ─────────────────────────────────────────────────────────────
+
+const VPS_FILE = './database/vps_data.json';
+function loadVPS() { return fs.existsSync(VPS_FILE) ? JSON.parse(fs.readFileSync(VPS_FILE, 'utf8')) : {}; }
+function saveVPS(data) { fs.writeFileSync(VPS_FILE, JSON.stringify(data, null, 2)); }
+function addVPS(dropletId, info) {
+  const db = loadVPS();
+  db[dropletId] = info;
+  saveVPS(db);
+}
+
+// ─────────────────────────────────────────────────────────────
+//   FILE DEPLOYMENT HELPER (for VPS + script)
 // ─────────────────────────────────────────────────────────────
 
 async function deployFileToVPS(ip, password, fileId, fileName, bot) {
   if (!fileId) {
     return { success: true, message: 'No file to deploy.', path: '/root' };
   }
+
   const fileLink = await bot.telegram.getFileLink(fileId);
   const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
   const fileBuffer = Buffer.from(response.data);
@@ -884,7 +940,7 @@ async function deployFileToVPS(ip, password, fileId, fileName, bot) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   DEOBFUSCATE
+//   DEOBFUSCATE COMMAND HELPER
 // ─────────────────────────────────────────────────────────────
 
 async function deobfuscateJavaScript(code) {
@@ -901,267 +957,17 @@ async function deobfuscateJavaScript(code) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//   CREATE CUSTOM BOT
+//   IMPORT FBI BOT STARTER (modified to export functions)
 // ─────────────────────────────────────────────────────────────
 
-async function createCustomBot(name) {
-  const templatePath = './templates/bot-template.zip';
-  if (!fs.existsSync(templatePath)) {
-    throw new Error('Bot template not found. Please ask the owner to upload it.');
-  }
-  const tempDir = path.join(__dirname, 'temp', `bot_${Date.now()}`);
-  ensureDir(tempDir);
-  const zip = new AdmZip(templatePath);
-  zip.extractAllTo(tempDir, true);
-  const settingsPath = path.join(tempDir, 'settings.js');
-  if (fs.existsSync(settingsPath)) {
-    let content = fs.readFileSync(settingsPath, 'utf8');
-    content = content.replace(/Samsung XMD/g, name);
-    content = content.replace(/samsung-md-bot/g, name.toLowerCase().replace(/\s+/g, '-'));
-    fs.writeFileSync(settingsPath, content);
-  }
-  const pkgPath = path.join(tempDir, 'package.json');
-  if (fs.existsSync(pkgPath)) {
-    let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    pkg.name = name.toLowerCase().replace(/\s+/g, '-');
-    pkg.description = `${name} - WhatsApp Bot`;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-  }
-  const newZip = new AdmZip();
-  newZip.addLocalFolder(tempDir);
-  const zipBuffer = newZip.toBuffer();
-  fs.rmSync(tempDir, { recursive: true, force: true });
-  return zipBuffer;
-}
+const fbiBot = require('../fbi/index'); // Path to FBI's index.js
+// Expected exports: { startXeonBotInc, requestPairingCode, sessionDir, ... }
 
 // ─────────────────────────────────────────────────────────────
-//   AI SETUP
+//   WHATSAPP SESSION STARTER (Samsung's own)
 // ─────────────────────────────────────────────────────────────
 
-const AI_CONFIG = {
-  model: 'gpt-3.5-turbo',
-  maxTokens: 1000,
-  temperature: 0.7,
-  systemPrompt: `You are a helpful AI assistant integrated into the Samsung XMD Telegram bot. 
-You can answer questions, solve problems, write code, explain concepts, and provide guidance. 
-Be concise, clear, and friendly. If you don't know something, say so.`
-};
-
-let openai = null;
-if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
-
-async function askAI(question, userId = null) {
-  if (!openai) throw new Error('OpenAI API key not configured.');
-  const messages = [
-    { role: 'system', content: AI_CONFIG.systemPrompt },
-    { role: 'user', content: question }
-  ];
-  try {
-    const response = await openai.chat.completions.create({
-      model: AI_CONFIG.model,
-      messages: messages,
-      max_tokens: AI_CONFIG.maxTokens,
-      temperature: AI_CONFIG.temperature,
-    });
-    return response.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('OpenAI error:', error);
-    throw new Error(`AI error: ${error.message}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//   EXPRESS WEBHOOK (ZAPIER)
-// ─────────────────────────────────────────────────────────────
-
-const app = express();
-app.use(express.json());
-const API_KEY = process.env.API_KEY || 'your-secret-key';
-
-app.post('/api/create-panel', async (req, res) => {
-  const { auth, username, ram, disk, cpu, isAdmin } = req.body;
-  if (auth !== API_KEY) return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    const result = await createPterodactylPanel(username, ram, disk, cpu, isAdmin || false);
-    res.json({ success: true, ...result });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────
-//   WEB PAIRING API (Vercel Frontend → Bot Server)
-// ─────────────────────────────────────────────────────────────
-
-// ── /api/pair — Generate WhatsApp pairing code via phone number ──
-app.post('/api/pair', async (req, res) => {
-  const { phone } = req.body;
-  if (!phone || phone.length < 7) {
-    return res.status(400).json({ error: 'Please enter a valid phone number (at least 7 digits)' });
-  }
-  const cleanPhone = String(phone).replace(/\D/g, '');
-  const uid = 'web_' + cleanPhone;
-  const sessionId = `wa_${uid}_${cleanPhone}`;
-
-  if (activeSockets.has(sessionId)) {
-    return res.status(409).json({ error: `+${cleanPhone} is already connected!` });
-  }
-
-  if (sessionExists(sessionId)) {
-    // Reconnect existing session — no pairing code needed
-    startWhatsApp(sessionId, null, null, uid).catch(e => logError('WEB-PAIR', e.message));
-    return res.json({ code: 'RECONNECTED', message: `+${cleanPhone} session restored.`, reconnected: true });
-  }
-
-  try {
-    const code = await new Promise((resolve, reject) => {
-      startWhatsApp(sessionId, null, cleanPhone, uid, (generatedCode) => {
-        resolve(generatedCode);
-      }).catch(reject);
-    });
-    // Update the pair record
-    addPair(uid, sessionId, cleanPhone);
-    logSuccess('WEB-PAIR', `Code generated for +${cleanPhone}`);
-    return res.json({ code, phone: cleanPhone });
-  } catch (e) {
-    logError('WEB-PAIR', `Pairing failed for +${cleanPhone}: ${e.message}`);
-    return res.status(500).json({ error: `Pairing failed: ${e.message}` });
-  }
-});
-
-// ── /api/status — Check pairing status for a number ──
-app.get('/api/status/:phone', (req, res) => {
-  const cleanPhone = req.params.phone.replace(/\D/g, '');
-  const uid = 'web_' + cleanPhone;
-  const sessionId = `wa_${uid}_${cleanPhone}`;
-  const isActive = activeSockets.has(sessionId);
-  return res.json({ phone: cleanPhone, connected: isActive, sessionId });
-});
-
-// ── /api/pairing-url — Get the Vercel pairing page URL ──
-app.get('/api/pairing-url', (req, res) => {
-  return res.json({ url: process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app' });
-});
-
-app.listen(3002, () => console.log('Webhook API on :3002'));
-
-// ─────────────────────────────────────────────────────────────
-//   GITHUB SESSION SYNC
-// ─────────────────────────────────────────────────────────────
-
-const GH_TOKEN  = settings.GITHUB_TOKEN  || process.env.GITHUB_TOKEN;
-const GH_USER   = settings.GITHUB_USERNAME || process.env.GITHUB_USERNAME;
-const GH_REPO   = settings.GITHUB_REPO   || process.env.GITHUB_REPO;
-const GH_BRANCH = settings.GITHUB_BRANCH || process.env.GITHUB_BRANCH || 'main';
-
-function ghRequest(method, urlPath, body = null) {
-  return new Promise((resolve, reject) => {
-    const data = body ? JSON.stringify(body) : null;
-    const opts = {
-      hostname: 'api.github.com',
-      path: `/repos/${GH_USER}/${GH_REPO}/contents/${urlPath}?ref=${GH_BRANCH}`,
-      method,
-      headers: {
-        'Authorization': `Bearer ${GH_TOKEN}`,
-        'User-Agent': 'Samsung-MD',
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}),
-      },
-    };
-    const req = https.request(opts, (res) => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); }
-        catch { resolve({ status: res.statusCode, body: raw }); }
-      });
-    });
-    req.on('error', reject);
-    if (data) req.write(data);
-    req.end();
-  });
-}
-
-async function ghListDir(remotePath) {
-  const { status, body } = await ghRequest('GET', remotePath);
-  if (status !== 200 || !Array.isArray(body)) return [];
-  return body;
-}
-
-async function ghGetFile(remotePath) {
-  const { status, body } = await ghRequest('GET', remotePath);
-  if (status !== 200 || !body.content) return null;
-  return { content: Buffer.from(body.content.replace(/\n/g, ''), 'base64'), sha: body.sha };
-}
-
-async function ghDeleteFile(remotePath, sha, message) {
-  return ghRequest('DELETE', remotePath, { message, sha });
-}
-
-async function downloadSessionFromGitHub(sessionId) {
-  try {
-    const remotePath = `sessions/${sessionId}`;
-    const files = await ghListDir(remotePath);
-    if (!files.length) return false;
-    const localDir = sessionDir(sessionId);
-    ensureDir(localDir);
-    for (const f of files) {
-      if (f.type !== 'file') continue;
-      const fileData = await ghGetFile(`${remotePath}/${f.name}`);
-      if (!fileData) continue;
-      fs.writeFileSync(path.join(localDir, f.name), fileData.content);
-      logInfo('GH-SYNC', `Downloaded: ${sessionId}/${f.name}`);
-    }
-    return true;
-  } catch (e) {
-    logError('GH-SYNC', `Download failed for ${sessionId}: ${e.message}`);
-    return false;
-  }
-}
-
-async function deleteSessionFromGitHub(sessionId) {
-  try {
-    const files = await ghListDir(`sessions/${sessionId}`);
-    for (const f of files) {
-      if (f.type === 'file') await ghDeleteFile(`sessions/${sessionId}/${f.name}`, f.sha, `Logout cleanup: ${sessionId}`);
-    }
-    logInfo('GH-SYNC', `Deleted from GitHub: ${sessionId}`);
-  } catch (e) {
-    logError('GH-SYNC', `GH delete failed for ${sessionId}: ${e.message}`);
-  }
-}
-
-async function syncSessionsFromGitHub() {
-  try {
-    const { status, body } = await ghRequest('GET', '');
-    if (status !== 200 || !Array.isArray(body)) return;
-    const sessionIds = new Set();
-    for (const item of body) {
-      const m = item.path.match(/^sessions\/([^\/]+)\/creds\.json$/);
-      if (m) sessionIds.add(m[1]);
-    }
-    if (!sessionIds.size) { logInfo('GH-SYNC', 'No remote sessions'); return; }
-    for (const sid of sessionIds) {
-      if (!sessionExists(sid)) {
-        logInfo('GH-SYNC', `Downloading: ${sid}`);
-        await downloadSessionFromGitHub(sid);
-      } else {
-        logInfo('GH-SYNC', `Already local: ${sid}`);
-      }
-    }
-  } catch (e) {
-    logError('GH-SYNC', `Sync error: ${e.message}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//   WHATSAPP SESSION STARTER
-// ─────────────────────────────────────────────────────────────
-
-async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null, tgUserId = null, pairingCodeCallback = null, botInstance = null) {
+async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null, tgUserId = null, pairingCodeCallback = null) {
   const dir = sessionDir(sessionId);
   ensureDir(dir);
 
@@ -1222,10 +1028,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
         deleteSessionFromGitHub(sessionId).catch(() => {});
         if (telegramChatId) {
           const mainBot = global._mainBotInstance;
-          if (mainBot) {
-        const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
-        mainBot.telegram.sendMessage(telegramChatId, `🚪 +${sock.__waNum||pairPhone} logged out & session deleted.\nUse the web page to reconnect:\n🔗 ${pairingUrl}`).catch(()=>{});
-      }
+          if (mainBot) mainBot.telegram.sendMessage(telegramChatId, `🚪 +${sock.__waNum||pairPhone} logged out & session deleted.\nUse /pair to reconnect.`).catch(()=>{});
         }
       } else {
         logWarn(sessionId, 'Reconnecting...');
@@ -1249,7 +1052,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
     }
   });
 
-  // ── WhatsApp Message Handler ──
+  // WhatsApp Message Handler
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const m of messages) {
@@ -1260,7 +1063,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
       const body = m.message.conversation || m.message.extendedTextMessage?.text || '';
       const prefix = getWaSettings(sock.__waNum)?.prefix || settings.DEFAULT_PREFIX || '.';
 
-      // ── `buypanel @username` on WhatsApp ──
+      // buypanel@username
       const panelMatch = body.match(new RegExp(`^${prefix}buypanel[@\\s](.+)$`));
       if (panelMatch) {
         const username = panelMatch[1].trim();
@@ -1282,7 +1085,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
         return;
       }
 
-      // ── List response (panel selection) ──
+      // list response
       if (mtype === 'listResponseMessage') {
         const selectedId = m.message.listResponseMessage?.singleSelectReply?.selectedRowId;
         if (selectedId && selectedId.startsWith('panel_')) {
@@ -1312,7 +1115,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
         }
       }
 
-      // ── Verify payment ──
+      // verifypayment
       if (body.startsWith(prefix + 'verifypayment')) {
         const from = m.key.remoteJid;
         const sender = m.key.fromMe ? sock.user.id : m.key.participant || m.key.remoteJid;
@@ -1374,7 +1177,7 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
         return;
       }
 
-      // ── Normal message handling ──
+      // Normal message handling
       (async () => {
         const chatMeta = { groupName: '' };
         if (m.key.remoteJid?.endsWith('@g.us')) {
@@ -1403,7 +1206,9 @@ async function startWhatsApp(sessionId, telegramChatId = null, pairPhone = null,
   return sock;
 }
 
-// ─── WHATSAPP PANEL LIST AND PAYMENT HELPERS ──────────────────
+// ─────────────────────────────────────────────────────────────
+//   WHATSAPP PANEL HELPERS (for buypanel)
+// ─────────────────────────────────────────────────────────────
 
 async function sendPanelList(sock, from, username, quotedMsg) {
   const panelOptions = [
@@ -1524,273 +1329,94 @@ async function processPanelPayment(sock, from, sender, username, spec, m, prefix
 }
 
 // ─────────────────────────────────────────────────────────────
-//   HELPERS FOR PANEL SELECTION & PAYMENT (Telegram)
+//   TELEGRAM BOT – SETUP FUNCTION (reusable for clones)
 // ─────────────────────────────────────────────────────────────
 
-const ramMap = {
-  '1gb': { ram: 1024, disk: 1024, cpu: 40, price: 1, isAdmin: false },
-  '2gb': { ram: 2048, disk: 2048, cpu: 60, price: 2, isAdmin: false },
-  '3gb': { ram: 3072, disk: 3072, cpu: 80, price: 3, isAdmin: false },
-  '4gb': { ram: 4096, disk: 4096, cpu: 100, price: 4, isAdmin: false },
-  'unlimited': { ram: 0, disk: 0, cpu: 0, price: 8, isAdmin: false },
-  'cpanel': { ram: 1024, disk: 1024, cpu: 40, price: 10, isAdmin: true },
-};
+// Store cloned bots globally
+const clonedBots = new Map();
+global.clonedBots = clonedBots;
 
-async function showRamSelection(ctx, sessionKey, username, isVps = false) {
-  const price = db.prices.panel[isVps ? 'vps' : 'panel'][username] || 0;
-  // ... original implementation (inline keyboard)
-}
+// Local state for user interactions (pairing, etc.)
+const localStates = new Map();
 
-async function showVpsRamSelection(ctx, sessionKey, username) {
-  // ...
-}
-
-async function handleTokenChoice(ctx, userId, sessionKey, spec, isVps = false) {
-  // ...
-}
-
-async function proceedToPayment(ctx, userId, sessionKey, spec, isVps) {
-  // ...
-}
-
-async function verifyAndCreatePanel(ctx, reference, pending) {
-  // This includes bulk handling
-  if (pending.bulk) {
-    const { prefix, count, plan, ram, userId } = pending;
-    let created = [];
-    for (let i = 1; i <= count; i++) {
-      const username = `${prefix}${i}`;
-      const existingUserId = await findPterodactylUser(username);
-      const res = await createPterodactylPanel(username, ram, 1024, 40, false, existingUserId);
-      created.push({ username, password: res.password, domain: res.panelDomain });
-      if (!db.users[userId].panels) db.users[userId].panels = [];
-      db.users[userId].panels.push({
-        type: 'PANEL',
-        username,
-        ram,
-        disk: 1024,
-        cpu: 40,
-        createdAt: new Date().toISOString(),
-        credentials: {
-          username: res.username,
-          password: res.password,
-          domain: res.panelDomain,
-          serverId: res.serverId,
-        }
-      });
-      saveDb();
-    }
-    const credentials = created.map((c, idx) => `${idx+1}. ${c.username} | ${c.password} | ${c.domain}`).join('\n');
-    await ctx.reply(`✅ *Bulk Panels Created!*\n\n${credentials}`, { parse_mode: 'Markdown' });
-    pendingPayments.delete(reference);
-    return;
-  }
-  // ... normal single panel creation
-}
-
-// ─────────────────────────────────────────────────────────────
-//   HELPER: SHOW WELCOME (with the new keyboard)
-// ─────────────────────────────────────────────────────────────
-
-async function showWelcome(ctx, lang) {
-  const userId = String(ctx.from.id);
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
-
-  const botInfo = await ctx.telegram.getMe();
-  const botUsername = botInfo.username || 'Bot';
-
-  // ── NEW KEYBOARD LAYOUT ──
-  const keyboard = {
-    reply_markup: {
-      keyboard: [
-        ['𝑷𝑨𝑰𝑹 𝑺𝑨𝑴𝑺𝑼𝑵𝑮 𝑴𝑫 𝑷𝑹𝑬𝑴𝑰𝑼𝑴'],
-        ['𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑬 𝑺𝑬𝑺𝑺𝑰𝑶𝑵 𝑰𝑫'],
-        ['𝑩𝑼𝒀 𝑷𝑨𝑵𝑬𝑳'],
-        ['𝑩𝑼𝒀 𝑨𝑫𝑴𝑰𝑵 𝑷𝑨𝑵𝑬𝑳'],
-        ['𝑫𝑬𝑳 𝑷𝑨𝑰𝑹', '𝑹𝑬𝑭𝑹𝑬𝑺𝑯 𝑺𝑬𝑺𝑺𝑰𝑶𝑵'],
-        ['𝑩𝑼𝒀 + 𝑺𝑪𝑹𝑰𝑷𝑻', '𝑽𝑬𝑹𝑰𝑭𝒀 𝑷𝑨𝒀'],
-        ['𝑽𝑷𝑺 𝑴𝑬𝑵𝑼', '𝑰𝑵𝑺𝑻𝑨𝑳𝑳 𝑴𝑬𝑵𝑼'],
-        ['𝑶𝑾𝑵𝑬𝑹 𝑴𝑬𝑵𝑼', '𝑴𝒀 𝑷𝑹𝑶𝑭𝑰𝑳𝑬'],
-        ['𝑪𝑹𝑬𝑨𝑻𝑬 𝑩𝑶𝑻', '𝑹𝑬𝑷𝑶𝑹𝑻 𝑩𝑼𝑮'],
-        ['𝑩𝑶𝑻 𝑭𝑰𝑳𝑬𝑺', '𝑴𝒀 𝑻𝑶𝑲𝑬𝑵𝑺'],
-        ['𝑴𝒀 𝑷𝑨𝑵𝑬𝑳𝑺', '𝑪𝑳𝑶𝑵𝑬 𝑩𝑶𝑻'],
-      ],
-      resize_keyboard: true,
-    },
-  };
-
-  const text = t.welcome;
-
-  try {
-    await ctx.replyWithPhoto(
-      { url: 'https://res.cloudinary.com/dqxlb29uz/image/upload/v1784728701/bwm_uploads/media-1784728700497.jpg' },
-      { caption: text, parse_mode: 'Markdown', ...keyboard }
-    );
-  } catch {
-    await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//   TELEGRAM BOT SETUP (ALL COMMANDS & HANDLERS)
-// ─────────────────────────────────────────────────────────────
-
-function setupBot(botInstance, options = {}) {
-  const { isMain = false } = options;
-
-  // ── User state tracking ──
-  const localStates = new Map();
-
-  // ── Broadcast pending ──
-  const broadcastPending = new Set();
-
-  // ─────────────────────────────────────────────────────────────
-  //   START COMMAND
-  // ─────────────────────────────────────────────────────────────
+function setupBot(botInstance) {
+  // ── /start ────────────────────────────────────────────────────
   botInstance.start(async (ctx) => {
-    const userId = String(ctx.from.id);
-
-    // Check banned
-    if (db.bannedUsers && db.bannedUsers.includes(userId)) {
-      return ctx.reply('⛔ You are banned from using this bot.');
-    }
-
-    ensureUser(userId);
-    const userLang = db.users[userId].language || 'en';
-
-    // ── If language not selected, show selection ──
-    if (!db.users[userId].language) {
-      const langButtons = [];
-      for (let i = 0; i < SUPPORTED_LANGUAGES.length; i += 2) {
-        const row = [];
-        row.push(Markup.button.callback(
-          SUPPORTED_LANGUAGES[i].name,
-          `set_lang_${SUPPORTED_LANGUAGES[i].code}`
-        ));
-        if (i + 1 < SUPPORTED_LANGUAGES.length) {
-          row.push(Markup.button.callback(
-            SUPPORTED_LANGUAGES[i + 1].name,
-            `set_lang_${SUPPORTED_LANGUAGES[i + 1].code}`
-          ));
-        }
-        langButtons.push(row);
-      }
-      await ctx.reply(
-        TRANSLATIONS[userLang].languagePrompt,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(langButtons),
-        }
-      );
-      return;
-    }
-
-    // ── Show welcome with the new keyboard ──
-    await showWelcome(ctx, userLang);
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  //   LANGUAGE SELECTION CALLBACK
-  // ─────────────────────────────────────────────────────────────
-  botInstance.action(/set_lang_(.+)/, async (ctx) => {
-    await ctx.answerCbQuery();
-    const langCode = ctx.match[1];
-    const userId = String(ctx.from.id);
-
-    if (!SUPPORTED_LANGUAGES.some(l => l.code === langCode)) {
-      return ctx.reply('❌ Invalid language.');
-    }
-
-    ensureUser(userId);
-    db.users[userId].language = langCode;
-    saveDb();
-
-    const langName = SUPPORTED_LANGUAGES.find(l => l.code === langCode).name;
-    await ctx.editMessageText(
-      TRANSLATIONS[langCode].languageSet.replace('{lang}', langName),
-      { parse_mode: 'Markdown' }
-    );
-    await showWelcome(ctx, langCode);
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  //   PAIRING CALLBACKS → redirect to web
-  // ─────────────────────────────────────────────────────────────
-  botInstance.action('pair_new', async (ctx) => {
-    await ctx.answerCbQuery();
-    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
-    await ctx.editMessageText(
-      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\n\n🔗 [Open Pairing Page](${pairingUrl})\n\nSimply visit the link and enter your phone number to get a pairing code!`,
-      { parse_mode: 'Markdown' }
-    );
-  });
-
-  botInstance.action('pair_existing', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\n\n🔗 [Open Pairing Page](${process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app'})\n\nExisting sessions are automatically detected and reconnected!`,
-      { parse_mode: 'Markdown' }
-    );
-  });
-
-  botInstance.action('pair_cancel', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.editMessageText('❌ Pairing cancelled. Visit the web page anytime to pair.');
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  //   COMMANDS
-  // ─────────────────────────────────────────────────────────────
-
-  // ── /pair ──
-  botInstance.command('pair', async (ctx) => {
     registerUser(ctx.from.id, ctx.from.first_name);
-    const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
-    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
-    return ctx.reply(
-      `🌐 *Web Pairing*\n\nPairing is now done through our web page.\nVisit the link below and enter your phone number to get a pairing code.\n\n🔗 [Pair Your WhatsApp](${pairingUrl})\n\nJust visit the link and follow the instructions on the page!`,
-      { parse_mode: 'Markdown' }
-    );
-  });
+    const userId = String(ctx.from.id);
+    ensureUser(userId);
+    const uptime = formatUptime(Date.now() - global.botStartTime);
 
-  // ── /delpair ──
-  botInstance.command('delpair', async (ctx) => {
-    const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
-    if (!phone) return ctx.reply('Usage: /delpair 254704955033\n\nOr manage your pairs on the web: https://your-pairing-site.vercel.app');
-    const uid = String(ctx.from.id);
-    const sessionId = `wa_${uid}_${phone}`;
-    const sock = activeSockets.get(sessionId);
+    // Bot username (optional, not used in keyboard)
+    const botInfo = await ctx.telegram.getMe();
+    const botUsername = botInfo.username || 'Bot';
 
-    if (sock) {
-      try { await sock.logout(); } catch {}
-      try { sock.ws?.close(); } catch {}
-      activeSockets.delete(sessionId);
+    // ── NEW KEYBOARD WITH STYLISED BUTTONS ──
+    const keyboard = {
+      reply_markup: {
+        keyboard: [
+          ['𝑷𝑨𝑰𝑹 𝑺𝑨𝑴𝑺𝑼𝑵𝑮 𝑿𝑴𝑫'],
+          ['𝑷𝑨𝑰𝑹 𝑭𝑩𝑰 𝑿𝑴𝑫'],
+          ['𝑩𝑼𝒀 𝑷𝑨𝑵𝑬𝑳'],
+          ['𝑫𝑬𝑳 𝑷𝑨𝑰𝑹', '𝑪𝑳𝑶𝑵𝑬 𝑩𝑶𝑻'],
+          ['𝑨𝑫𝑴𝑰𝑵 𝑷𝑨𝑵𝑬𝑳', '𝑯𝑬𝑳𝑷'],
+          ['𝑽𝑬𝑹𝑰𝑭𝒀 𝑷𝑨𝒀𝑴𝑬𝑵𝑻', '𝑽𝑷𝑺 𝑴𝑬𝑵𝑼'],
+          ['𝑰𝑵𝑺𝑻𝑨𝑳𝑳 𝑴𝑬𝑵𝑼', '𝑶𝑾𝑵𝑬𝑹 𝑴𝑬𝑵𝑼'],
+          ['𝑷𝑨𝒀 𝑾𝑰𝑻𝑯 𝑷𝑬𝑺𝑨𝑷𝑨𝑳', '𝑴𝒀 𝑷𝑹𝑶𝑭𝑰𝑳𝑬'],
+          ['𝑪𝑹𝑬𝑨𝑻𝑬 𝑩𝑶𝑻', '𝑩𝑶𝑻 𝑭𝑰𝑳𝑬𝑺'],
+          ['𝑹𝑬𝑷𝑶𝑹𝑻 𝑩𝑼𝑮', '𝑴𝒀 𝑻𝑶𝑲𝑬𝑵𝑺'],
+        ],
+        resize_keyboard: true,
+      },
+    };
+
+    const text =
+`
+  •━═〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙═━•
+
+╭═━⪩ 〘 SYSTEM INFO 〙•━•
+│⫹⫺ 𝗕𝗢𝗧:〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙
+│⫹⫺ 𝗗𝗘𝗩: 𝑼𝒍𝒕𝒓𝒂 𝒊𝒏𝒇𝒊𝒏𝒊𝒕𝒚
+│⫹⫺ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡: 𝐕𝐈𝐒𝐈𝐎𝐍 𝟐.𝟎
+│⫹⫺ 𝗠𝗢𝗗𝗘: public
+│⫹⫺ 𝗣𝗟𝗔𝗧𝗙𝗢𝗥𝗠: 𝒍𝒊𝒏𝒖𝒙
+│⫹⫺ 𝗨𝗣𝗧𝗜𝗠𝗘: ${uptime}
+│⫹⫺ 𝗢𝗪𝗡𝗘𝗥: ⃝⃪ 𝑺𝒂𝒎𝒔𝒖𝒏𝒈 
+╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
+
+╭━━•›〘 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 〙•━•
+│⌬ /pair <number>
+│⌬ /delpair <number>
+│⌬ /listpaired
+│⌬ /buypanel
+│⌬ /cpanel <username>
+│⌬ /verifypayment [reference]
+│⌬ /adminpanel (owner)
+│⌬ /reportissue <msg>
+│⌬ /broadcast (owner)
+│⌬ /listprem (owner)
+│⌬ /cvps (create VPS)
+│⌬ /installpanel (panel installer)
+│⌬ /pesapal <amount> [desc] (Pay with Pesapal)
+╰━ ━ ━ ━ ━ ━ ━ ━ ━ ━•
+
+⌬ 〘 𝐒𝚰𝐋𝚬𝚴𝐂𝚬𝚪 𝚵𝚳𝐃 〙`;
+
+    try {
+      await ctx.replyWithPhoto(
+        { url: 'https://res.cloudinary.com/dqxlb29uz/image/upload/v1784728701/bwm_uploads/media-1784728700497.jpg' },
+        { caption: text, parse_mode: 'Markdown', ...keyboard }
+      );
+    } catch {
+      await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
     }
-
-    notifiedConnected.delete(sessionId);
-    removePair(uid, sessionId);
-    const ok = deleteSession(sessionId);
-    deleteSessionFromGitHub(sessionId).catch(() => {});
-
-    await ctx.reply(ok
-      ? `🗑 +${phone} deleted. Use /pair ${phone} to reconnect.`
-      : `ℹ️ No session found for +${phone}.`
-    );
   });
 
-  // ── /listpaired ──
-  botInstance.command('listpaired', async (ctx) => {
-    const pairs = getUserPairs(String(ctx.from.id));
-    const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
-    if (!pairs.length) return ctx.reply(`No paired numbers. Visit the web to pair:\n🔗 [Pair Now](${pairingUrl})`);
-    const list = pairs.map((p, i) => {
-      const status = activeSockets.has(p.sessionId) ? '🟢' : '🔴';
-      return `${i+1}. +${p.waNum} - Session: \`${p.sessionId}\` ${status}`;
-    }).join('\n');
-    await ctx.reply(`📱 *Your numbers (${pairs.length}):*\n\n${list}`, { parse_mode: 'Markdown' });
-  });
+  // ─────────────────────────────────────────────────────────────
+  //   COMMAND DEFINITIONS (unchanged except pair buttons)
+  // ─────────────────────────────────────────────────────────────
 
-  // ── /buypanel ──
+  // Buy Panel
   botInstance.command('buypanel', async (ctx) => {
     registerUser(ctx.from.id, ctx.from.first_name);
     if (!canUseBot(ctx.from.id)) {
@@ -1798,13 +1424,10 @@ function setupBot(botInstance, options = {}) {
     }
     const userId = String(ctx.from.id);
     localStates.set(userId, { action: 'buypanel_username' });
-    await ctx.reply(
-      '🛒 *Enter username for your VPS:*\n\n(Only letters, numbers, underscore, min 3 chars)',
-      { parse_mode: 'Markdown' }
-    );
+    await ctx.reply('🛒 *Enter username for your VPS:*\n\n(Only letters, numbers, underscore, min 3 chars)', { parse_mode: 'Markdown' });
   });
 
-  // ── /cpanel (Admin Panel) ──
+  // Admin Panel (cPanel)
   botInstance.command('cpanel', async (ctx) => {
     registerUser(ctx.from.id, ctx.from.first_name);
     if (!canUseBot(ctx.from.id)) {
@@ -1815,10 +1438,7 @@ function setupBot(botInstance, options = {}) {
     if (!username) {
       const userId = String(ctx.from.id);
       localStates.set(userId, { action: 'cpanel_username' });
-      return ctx.reply(
-        '👑 *Enter username for Admin Panel (cPanel):*\n\n(Only letters, numbers, underscore, min 3 chars)',
-        { parse_mode: 'Markdown' }
-      );
+      return ctx.reply('👑 *Enter username for Admin Panel (cPanel):*\n\n(Only letters, numbers, underscore, min 3 chars)', { parse_mode: 'Markdown' });
     }
     const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     if (!cleanUsername || cleanUsername.length < 3) {
@@ -1830,7 +1450,7 @@ function setupBot(botInstance, options = {}) {
     await showRamSelection(ctx, sessionKey, cleanUsername, false);
   });
 
-  // ── /verifypayment ──
+  // Verify Payment
   botInstance.command('verifypayment', async (ctx) => {
     const args = ctx.message.text.split(/\s+/);
     const providedRef = args[1] ? args[1].trim() : null;
@@ -1853,7 +1473,58 @@ function setupBot(botInstance, options = {}) {
     await verifyAndCreatePanel(ctx, latest[0], latest[1]);
   });
 
-  // ── /adminpanel ──
+  // Pair Device (command – optional, but we keep it for manual use)
+  botInstance.command('pair', async (ctx) => {
+    registerUser(ctx.from.id, ctx.from.first_name);
+    const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
+    if (!phone || phone.length < 7) {
+      return ctx.reply('Usage: `/pair 254704955033`', { parse_mode: 'Markdown' });
+    }
+    const uid = String(ctx.from.id);
+    const sessionId = `wa_${uid}_${phone}`;
+    if (activeSockets.has(sessionId)) {
+      return ctx.reply(`✅ +${phone} already connected!\nUse /delpair ${phone} to disconnect.`);
+    }
+    if (sessionExists(sessionId)) {
+      await ctx.reply(`♻️ Reconnecting +${phone}...`);
+      await startWhatsApp(sessionId, ctx.chat.id, null, uid);
+      return;
+    }
+    await ctx.reply(`🔄 Pairing *+${phone}*...`, { parse_mode: 'Markdown' });
+    await startWhatsApp(sessionId, ctx.chat.id, phone, uid);
+  });
+
+  // Delete Pair
+  botInstance.command('delpair', async (ctx) => {
+    const phone = ctx.message.text.split(/\s+/)[1]?.replace(/\D/g, '');
+    if (!phone) return ctx.reply('Usage: /delpair 254704955033');
+    const uid       = String(ctx.from.id);
+    const sessionId = `wa_${uid}_${phone}`;
+    const sock = activeSockets.get(sessionId);
+    if (sock) {
+      try { await sock.logout(); } catch {}
+      try { sock.ws?.close(); } catch {}
+      activeSockets.delete(sessionId);
+    }
+    notifiedConnected.delete(sessionId);
+    removePair(uid, sessionId);
+    const ok = deleteSession(sessionId);
+    deleteSessionFromGitHub(sessionId).catch(() => {});
+    await ctx.reply(ok
+      ? `🗑 +${phone} deleted. Use /pair ${phone} to reconnect.`
+      : `ℹ️ No session found for +${phone}.`
+    );
+  });
+
+  // List Paired
+  botInstance.command('listpaired', async (ctx) => {
+    const pairs = getUserPairs(String(ctx.from.id));
+    if (!pairs.length) return ctx.reply('No paired numbers. Use /pair <number>');
+    const list = pairs.map((p, i) => `${i+1}. +${p.waNum} ${activeSockets.has(p.sessionId) ? '🟢' : '🔴'}`).join('\n');
+    await ctx.reply(`📱 *Your numbers (${pairs.length}):*\n\n${list}`, { parse_mode: 'Markdown' });
+  });
+
+  // Admin Panel
   botInstance.command('adminpanel', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const stats = {
@@ -1862,416 +1533,12 @@ function setupBot(botInstance, options = {}) {
       premUsers: premData.premUsers.length,
     };
     await ctx.reply(
-      `⚙️ *Admin Panel*\n\n👤 Users: ${stats.totalUsers}\n📱 Sessions: ${stats.sessions}\n💎 Premium: ${stats.premUsers}\n\nUse owner commands: /addprem, /delprem, /broadcast, /listprem, /addlink, /removelink, /listlinks, /setpesapal, /addstorefile, /liststorefiles, /removestorefile, /setprice, /bulkpanels, /addcmd, /ban, /unban`,
+      `⚙️ *Admin Panel*\n\n👤 Users: ${stats.totalUsers}\n📱 Sessions: ${stats.sessions}\n💎 Premium: ${stats.premUsers}\n\nUse owner commands: /addprem, /delprem, /broadcast, /listprem, /addlink, /removelink, /listlinks, /setpesapal, /addstorefile, /liststorefiles, /removestorefile`,
       { parse_mode: 'Markdown' }
     );
   });
 
-  // ── /profile ──
-  botInstance.command('profile', async (ctx) => {
-    const userId = String(ctx.from.id);
-    ensureUser(userId);
-    const user = ctx.from;
-    const isPrem = isPremium(userId);
-    const pairs = getUserPairs(userId);
-    const pairedList = pairs.length ? pairs.map(p => `+${p.waNum}`).join(', ') : 'None';
-    const allVps = loadVPS();
-    const myVps = Object.entries(allVps).filter(([id, info]) => String(info.owner) === userId);
-    let vpsList = 'None';
-    if (myVps.length) {
-      vpsList = myVps.map(([id, info]) => `• ${info.hostname} (${info.ip || 'N/A'})`).join('\n');
-    }
-    const tokens = db.users[userId]?.tokens || 0;
-    const referrals = db.users[userId]?.referralsCount || 0;
-    const code = db.users[userId]?.referralCode || 'N/A';
-
-    const msg =
-      `👤 *Your Profile*\n\n` +
-      `🆔 ID: \`${userId}\`\n` +
-      `👤 Name: ${user.first_name || ''} ${user.last_name || ''}\n` +
-      `💎 Premium: ${isPrem ? '✅ Yes' : '❌ No'}\n` +
-      `📱 Paired Numbers: ${pairedList}\n` +
-      `🖥️ Your VPS:\n${vpsList}\n` +
-      `🔗 Referral Code: \`${code}\`\n` +
-      `💰 Tokens: ${tokens}\n` +
-      `👥 Referrals: ${referrals}`;
-    await ctx.reply(msg, { parse_mode: 'Markdown' });
-  });
-
-  // ── /createbot ──
-  botInstance.command('createbot', async (ctx) => {
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) {
-      return ctx.reply('Usage: /createbot <bot_name>\nExample: `/createbot MySuperBot`', { parse_mode: 'Markdown' });
-    }
-    const name = args.slice(1).join(' ').trim();
-    if (!name || name.length < 3) {
-      return ctx.reply('❌ Bot name must be at least 3 characters.');
-    }
-    const sanitized = name.replace(/[^a-zA-Z0-9 _-]/g, '');
-    if (sanitized !== name) {
-      return ctx.reply('❌ Bot name can only contain letters, numbers, spaces, underscores, and hyphens.');
-    }
-    await ctx.reply(`⏳ Creating custom bot *${sanitized}*... This may take a moment.`, { parse_mode: 'Markdown' });
-    try {
-      const zipBuffer = await createCustomBot(sanitized);
-      await ctx.replyWithDocument(
-        { source: zipBuffer, filename: `${sanitized}-bot.zip` },
-        {
-          caption:
-            `✅ *Your custom bot is ready!*\n\nName: *${sanitized}*\n\n📦 *Next steps:*\n` +
-            `1. Extract the ZIP file.\n2. Edit \`settings.js\` with your credentials.\n3. Run \`npm install\` and \`npm start\`.\n\n⚠️ Keep your credentials safe!`,
-          parse_mode: 'Markdown'
-        }
-      );
-    } catch (err) {
-      await ctx.reply(`❌ Failed to create bot: ${err.message}`);
-    }
-  });
-
-  // ── /botfiles ──
-  botInstance.command('botfiles', async (ctx) => {
-    const store = db.fileStore || [];
-    if (!store.length) {
-      return ctx.reply('📭 No bot files available at the moment. Check back later.');
-    }
-    const buttons = store.map(f => ([
-      Markup.button.callback(`📦 ${f.name}`, `download_file_${f.fileId}`)
-    ]));
-    await ctx.reply(
-      '📁 *Available Bot Files*\n\nClick a file to download it.',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons)
-      }
-    );
-  });
-
-  // ── /bugreport ──
-  botInstance.command('bugreport', async (ctx) => {
-    const description = ctx.message.text.replace(/^\/bugreport\s*/, '').trim();
-    if (!description) {
-      return ctx.reply('Usage: /bugreport <description of the bug>\n\nYou can reply to a message with a file to attach it.');
-    }
-    const user = ctx.from;
-    const userId = String(ctx.from.id);
-    const reportMsg = `🐛 *Bug Report*\n\n` +
-      `👤 User: ${user.first_name || ''} ${user.last_name || ''} (ID: \`${userId}\`)\n` +
-      `📝 Description:\n${description}`;
-    const reply = ctx.message.reply_to_message;
-    let fileToSend = null;
-    if (reply) {
-      if (reply.document) fileToSend = { type: 'document', file_id: reply.document.file_id };
-      else if (reply.photo) fileToSend = { type: 'photo', file_id: reply.photo[reply.photo.length-1].file_id };
-      else if (reply.video) fileToSend = { type: 'video', file_id: reply.video.file_id };
-      else if (reply.audio) fileToSend = { type: 'audio', file_id: reply.audio.file_id };
-    }
-    try {
-      const ownerId = settings.OWNER_TELEGRAM_ID;
-      if (fileToSend) {
-        if (fileToSend.type === 'document') {
-          await ctx.telegram.sendDocument(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
-        } else if (fileToSend.type === 'photo') {
-          await ctx.telegram.sendPhoto(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
-        } else if (fileToSend.type === 'video') {
-          await ctx.telegram.sendVideo(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
-        } else if (fileToSend.type === 'audio') {
-          await ctx.telegram.sendAudio(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
-        }
-      } else {
-        await ctx.telegram.sendMessage(ownerId, reportMsg, { parse_mode: 'Markdown' });
-      }
-      await ctx.reply('✅ Bug report sent to the developer. Thank you!');
-    } catch (err) {
-      await ctx.reply(`❌ Failed to send report: ${err.message}`);
-    }
-  });
-
-  // ── /referral ──
-  botInstance.command('referral', async (ctx) => {
-    const userId = String(ctx.from.id);
-    ensureUser(userId);
-    const user = db.users[userId];
-    const code = user.referralCode || 'Not set';
-    const tokens = user.tokens || 0;
-    const referrals = user.referralsCount || 0;
-    await ctx.reply(
-      `🔗 *Your Referral Info*\n\nCode: \`${code}\`\nTokens: ${tokens}\nReferrals: ${referrals}\n\nShare your code: /refer ${code}\nEach successful referral gives you 1 token (worth $1 off).`,
-      { parse_mode: 'Markdown' }
-    );
-  });
-
-  // ── /refer ──
-  botInstance.command('refer', async (ctx) => {
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) {
-      return ctx.reply('Usage: /refer <code>\nExample: /refer ABC123');
-    }
-    const code = args[1].toUpperCase().trim();
-    const userId = String(ctx.from.id);
-    ensureUser(userId);
-    if (db.users[userId].referredBy) {
-      return ctx.reply('❌ You have already used a referral code.');
-    }
-    let referrerId = null;
-    for (const [id, data] of Object.entries(db.users)) {
-      if (data.referralCode === code && id !== userId) {
-        referrerId = id;
-        break;
-      }
-    }
-    if (!referrerId) {
-      return ctx.reply('❌ Invalid referral code.');
-    }
-    db.users[referrerId].tokens = (db.users[referrerId].tokens || 0) + 1;
-    db.users[userId].tokens = (db.users[userId].tokens || 0) + 1;
-    db.users[referrerId].referralsCount = (db.users[referrerId].referralsCount || 0) + 1;
-    db.users[userId].referredBy = referrerId;
-    saveDb();
-    await ctx.reply(
-      `✅ You received 1 token!\nYour referrer also received 1 token.\n\nNow you have ${db.users[userId].tokens} token(s). Use them to get discounts on panels.`,
-      { parse_mode: 'Markdown' }
-    );
-    try {
-      await ctx.telegram.sendMessage(
-        referrerId,
-        `🎉 Someone used your referral code!\nYou earned 1 token. Total tokens: ${db.users[referrerId].tokens}.`,
-        { parse_mode: 'Markdown' }
-      );
-    } catch {}
-  });
-
-  // ── /mypanels ──
-  botInstance.command('mypanels', async (ctx) => {
-    const userId = String(ctx.from.id);
-    ensureUser(userId);
-    const panels = db.users[userId].panels || [];
-    if (!panels.length) {
-      return ctx.reply('📭 *You have no panels yet.*\nUse `/buypanel` to get one!', { parse_mode: 'Markdown' });
-    }
-    let msg = '📋 *Your Panels*\n\n';
-    panels.forEach((p, i) => {
-      const creds = p.credentials || {};
-      msg += `${i+1}. *${p.type}* – ${p.username}\n`;
-      msg += `   📊 RAM: ${p.ram}MB | 💾 Disk: ${p.disk}MB\n`;
-      msg += `   🔗 ${creds.domain || 'N/A'}\n`;
-      msg += `   📅 ${new Date(p.createdAt).toLocaleDateString()}\n\n`;
-    });
-    await ctx.reply(msg, { parse_mode: 'Markdown' });
-  });
-
-  // ── /refreshsession ──
-  botInstance.command('refreshsession', async (ctx) => {
-    const userId = String(ctx.from.id);
-    const pairs = getUserPairs(userId);
-    if (!pairs.length) {
-      return ctx.reply('ℹ️ No paired numbers to refresh.');
-    }
-    await ctx.reply(`🔄 Refreshing ${pairs.length} session(s)...`);
-    let refreshed = 0;
-    for (const pair of pairs) {
-      const sid = pair.sessionId;
-      const sock = activeSockets.get(sid);
-      if (sock) {
-        try { await sock.logout(); } catch {}
-        try { sock.ws?.close(); } catch {}
-        activeSockets.delete(sid);
-      }
-      try {
-        await startWhatsApp(sid, null, null, userId);
-        refreshed++;
-      } catch (e) {
-        console.error(`Failed to refresh ${sid}:`, e.message);
-      }
-    }
-    await ctx.reply(`✅ Refreshed ${refreshed} out of ${pairs.length} session(s).`);
-  });
-
-  // ── /ai ──
-  botInstance.command('ai', async (ctx) => {
-    const question = ctx.message.text.replace(/^\/ai\s*/, '').trim();
-    if (!question) {
-      return ctx.reply('❓ *Ask me anything!*\nUsage: `/ai <your question>`', { parse_mode: 'Markdown' });
-    }
-    await ctx.reply('🤖 *Thinking...*', { parse_mode: 'Markdown' });
-    try {
-      const answer = await askAI(question, String(ctx.from.id));
-      if (answer.length > 4000) {
-        const chunks = answer.match(/[\s\S]{1,4000}/g) || [];
-        for (const chunk of chunks) {
-          await ctx.reply(chunk, { parse_mode: 'Markdown' });
-        }
-      } else {
-        await ctx.reply(answer, { parse_mode: 'Markdown' });
-      }
-    } catch (error) {
-      await ctx.reply(`❌ Failed to get AI response: ${error.message}`);
-    }
-  });
-
-  // ── /cancel ──
-  botInstance.command('cancel', async (ctx) => {
-    const userId = String(ctx.from.id);
-    if (localStates.has(userId)) {
-      const state = localStates.get(userId);
-      if (state.timeoutId) clearTimeout(state.timeoutId);
-      localStates.delete(userId);
-      return ctx.reply('❌ Cancelled.');
-    }
-    if (broadcastPending.has(userId)) {
-      broadcastPending.delete(userId);
-      return ctx.reply('❌ Broadcast cancelled.');
-    }
-    return ctx.reply('Nothing to cancel.');
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  //   OWNER COMMANDS
-  // ─────────────────────────────────────────────────────────────
-
-  // ── /setprice (KES pricing) ──
-  botInstance.command('setprice', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 4) {
-      return ctx.reply('Usage: /setprice <type> <plan> <amount>\nExample: /setprice panel 2gb 2500');
-    }
-    const type = args[1];
-    const plan = args[2];
-    const amount = parseInt(args[3]);
-    if (isNaN(amount) || amount <= 0) return ctx.reply('❌ Invalid amount.');
-    if (!db.prices[type] || !db.prices[type][plan]) {
-      return ctx.reply(`❌ Plan "${plan}" not found for type "${type}".\nAvailable: panel (1gb,2gb,3gb,4gb,unlimited,cpanel), vps (1gb,2gb,4gb,8gb)`);
-    }
-    db.prices[type][plan] = amount;
-    saveDb();
-    await ctx.reply(`✅ Price for ${type} ${plan} set to ${amount} KES.`);
-  });
-
-  // ── /bulkpanels ──
-  botInstance.command('bulkpanels', async (ctx) => {
-    if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) {
-      return ctx.reply('❌ Owner/Premium only.');
-    }
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 4) {
-      return ctx.reply('Usage: /bulkpanels <prefix> <count> <plan>\nExample: /bulkpanels myvps 5 2gb');
-    }
-    const prefix = args[1];
-    const count = parseInt(args[2]);
-    const plan = args[3];
-    if (isNaN(count) || count < 1 || count > 20) {
-      return ctx.reply('❌ Count must be between 1 and 20.');
-    }
-    const ramMap = { '1gb': 1024, '2gb': 2048, '3gb': 3072, '4gb': 4096, 'unlimited': 0 };
-    const ram = ramMap[plan];
-    if (ram === undefined) {
-      return ctx.reply('❌ Invalid plan. Options: 1gb, 2gb, 3gb, 4gb, unlimited');
-    }
-    const pricePer = db.prices.panel[plan] || 0;
-    const totalPrice = pricePer * count;
-    const userId = String(ctx.from.id);
-    const reference = `BULK-${userId}-${Date.now()}`;
-
-    const init = await initPaystackPayment(totalPrice, `${userId}@telegram.bot`, reference, {
-      user_id: userId,
-      prefix,
-      count,
-      plan,
-      ram,
-      isAdmin: false,
-      bulk: true,
-    });
-
-    if (!init || !init.status) {
-      return ctx.reply('❌ Payment initiation failed.');
-    }
-
-    pendingPayments.set(reference, {
-      userId,
-      prefix,
-      count,
-      plan,
-      ram,
-      pricePer,
-      totalPrice,
-      isAdmin: false,
-      status: 'pending',
-      bulk: true,
-    });
-
-    await ctx.reply(
-      `💳 *Bulk Panel Purchase*\n${count} x ${plan.toUpperCase()} panels = ${totalPrice} KES\n\n[Pay Now](${init.data.authorization_url})\n\nAfter paying, use /verifypayment ${reference}`,
-      { parse_mode: 'Markdown' }
-    );
-  });
-
-  // ── /addcmd (custom commands) ──
-  botInstance.command('addcmd', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 3) {
-      return ctx.reply('Usage: /addcmd <name> <code>\nExample: /addcmd hello ctx.reply("Hello world!")');
-    }
-    const name = args[1];
-    const code = args.slice(2).join(' ');
-    db.customCommands[name] = { code, description: 'Custom', ownerOnly: false };
-    saveDb();
-    await ctx.reply(`✅ Command /${name} added.`);
-  });
-
-  // ── /delcmd ──
-  botInstance.command('delcmd', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) return ctx.reply('Usage: /delcmd <name>');
-    const name = args[1];
-    if (!db.customCommands[name]) return ctx.reply(`❌ Command /${name} not found.`);
-    delete db.customCommands[name];
-    saveDb();
-    await ctx.reply(`🗑️ Command /${name} deleted.`);
-  });
-
-  // ── /listcmd ──
-  botInstance.command('listcmd', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const names = Object.keys(db.customCommands);
-    if (!names.length) return ctx.reply('ℹ️ No custom commands.');
-    let msg = '*📋 Custom Commands:*\n';
-    names.forEach(name => {
-      msg += `• /${name}\n`;
-    });
-    await ctx.reply(msg, { parse_mode: 'Markdown' });
-  });
-
-  // ── /ban ──
-  botInstance.command('ban', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) return ctx.reply('Usage: /ban <user_id>');
-    const userId = args[1];
-    if (!db.bannedUsers) db.bannedUsers = [];
-    if (db.bannedUsers.includes(userId)) return ctx.reply(`⚠️ User ${userId} is already banned.`);
-    db.bannedUsers.push(userId);
-    saveDb();
-    await ctx.reply(`✅ User ${userId} banned.`);
-  });
-
-  // ── /unban ──
-  botInstance.command('unban', async (ctx) => {
-    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const args = ctx.message.text.split(/\s+/);
-    if (args.length < 2) return ctx.reply('Usage: /unban <user_id>');
-    const userId = args[1];
-    if (!db.bannedUsers || !db.bannedUsers.includes(userId)) {
-      return ctx.reply(`⚠️ User ${userId} is not banned.`);
-    }
-    db.bannedUsers = db.bannedUsers.filter(id => id !== userId);
-    saveDb();
-    await ctx.reply(`✅ User ${userId} unbanned.`);
-  });
-
-  // ── /premonly ──
+  // Premium Commands (unchanged)
   botInstance.command('premonly', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     premData.premOnly = !premData.premOnly;
@@ -2284,7 +1551,6 @@ function setupBot(botInstance, options = {}) {
     );
   });
 
-  // ── /addprem ──
   botInstance.command('addprem', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const target = ctx.message.text.split(/\s+/)[1];
@@ -2297,7 +1563,6 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`✅ Added *${target}* as premium user.`, { parse_mode: 'Markdown' });
   });
 
-  // ── /delprem ──
   botInstance.command('delprem', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const target = ctx.message.text.split(/\s+/)[1];
@@ -2311,19 +1576,17 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`🗑 Removed *${target}* from premium.`, { parse_mode: 'Markdown' });
   });
 
-  // ── /listprem ──
   botInstance.command('listprem', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-    const mode = premData.premOnly ? '🔒 Premium-only ON' : '🌐 Premium-only OFF';
-    const owners = [String(settings.OWNER_TELEGRAM_ID), ...premData.owners].join('\n') || 'none';
-    const prems = premData.premUsers.join('\n') || 'none';
+    const mode    = premData.premOnly ? '🔒 Premium-only ON' : '🌐 Premium-only OFF';
+    const owners  = [String(settings.OWNER_TELEGRAM_ID), ...premData.owners].join('\n') || 'none';
+    const prems   = premData.premUsers.join('\n') || 'none';
     await ctx.reply(
       `*Premium Status*\n${mode}\n\n*Owners:*\n${owners}\n\n*Premium Users:*\n${prems}`,
       { parse_mode: 'Markdown' }
     );
   });
 
-  // ── /addowner ──
   botInstance.command('addowner', async (ctx) => {
     if (String(ctx.from.id) !== String(settings.OWNER_TELEGRAM_ID)) return ctx.reply('❌ Main owner only.');
     const target = ctx.message.text.split(/\s+/)[1];
@@ -2334,19 +1597,52 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`✅ Promoted *${target}* to owner.`, { parse_mode: 'Markdown' });
   });
 
-  // ── /delown ──
-  botInstance.command('delown', async (ctx) => {
-    if (String(ctx.from.id) !== String(settings.OWNER_TELEGRAM_ID)) return ctx.reply('❌ Main owner only.');
-    const target = ctx.message.text.split(/\s+/)[1];
-    if (!target) return ctx.reply('Usage: /delown <telegram_id>');
-    const idx = premData.owners.indexOf(target);
-    if (idx === -1) return ctx.reply(`ℹ️ ${target} is not an owner.`);
-    premData.owners.splice(idx, 1);
-    savePrem();
-    await ctx.reply(`🗑 Removed *${target}* from owners.`, { parse_mode: 'Markdown' });
-  });
+  // Broadcast (unchanged)
+  const broadcastPending = new Set();
 
-  // ── /broadcast ──
+  function parseBroadcastButtons(text) {
+    if (!text) return { clean: text || '', markup: null };
+    const btnRegex = /\[([^\]|]+)\|([^\]]+)\]/g;
+    const rows = [];
+    let currentRow = [];
+    let clean = text;
+    let match;
+    const matches = [];
+    while ((match = btnRegex.exec(text)) !== null) matches.push(match);
+    if (!matches.length) return { clean: text, markup: null };
+    for (let i = 0; i < matches.length; i++) {
+      const m      = matches[i];
+      const label  = m[1].trim();
+      const url    = m[2].trim();
+      const before = i === 0 ? text.slice(0, m.index) : text.slice(matches[i-1].index + matches[i-1][0].length, m.index);
+      if (i > 0 && before.includes('\n')) { if (currentRow.length) rows.push(currentRow); currentRow = []; }
+      currentRow.push(Markup.button.url(label, url));
+    }
+    if (currentRow.length) rows.push(currentRow);
+    clean = text.replace(/\[([^\]|]+)\|([^\]]+)\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    return { clean, markup: rows.length ? Markup.inlineKeyboard(rows) : null };
+  }
+
+  async function sendBroadcastToUser(uid, msg) {
+    const tg      = botInstance.telegram;
+    const rawText = msg.text || msg.caption || '';
+    const { clean, markup } = parseBroadcastButtons(rawText);
+    const extra   = { parse_mode: 'Markdown', ...(markup || {}) };
+    if (msg.sticker)    return tg.sendSticker(uid, msg.sticker.file_id, markup ? { reply_markup: markup.reply_markup } : {});
+    if (msg.animation)  return tg.sendAnimation(uid, msg.animation.file_id, { caption: clean, ...extra });
+    if (msg.video_note) return tg.sendVideoNote(uid, msg.video_note.file_id);
+    if (msg.voice)      return tg.sendVoice(uid, msg.voice.file_id, { caption: clean, ...extra });
+    if (msg.photo) {
+      const photo = msg.photo[msg.photo.length - 1];
+      return tg.sendPhoto(uid, photo.file_id, { caption: clean, ...extra });
+    }
+    if (msg.video)    return tg.sendVideo(uid, msg.video.file_id, { caption: clean, ...extra });
+    if (msg.audio)    return tg.sendAudio(uid, msg.audio.file_id, { caption: clean, ...extra });
+    if (msg.document) return tg.sendDocument(uid, msg.document.file_id, { caption: clean, ...extra });
+    if (msg.text)     return tg.sendMessage(uid, clean || msg.text, extra);
+    return tg.forwardMessage(uid, msg.chat.id, msg.message_id);
+  }
+
   botInstance.command('broadcast', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     broadcastPending.add(String(ctx.from.id));
@@ -2356,7 +1652,15 @@ function setupBot(botInstance, options = {}) {
     );
   });
 
-  // ── /reportissue ──
+  botInstance.command('cancel', async (ctx) => {
+    if (broadcastPending.has(String(ctx.from.id))) {
+      broadcastPending.delete(String(ctx.from.id));
+      return ctx.reply('❌ Broadcast cancelled.');
+    }
+    return ctx.reply('Nothing to cancel.');
+  });
+
+  // Report Issue
   botInstance.command('reportissue', async (ctx) => {
     const report = ctx.message.text.replace(/^\/reportissue\s*/, '').trim();
     if (!report) return ctx.reply('/reportissue <problem>');
@@ -2372,7 +1676,7 @@ function setupBot(botInstance, options = {}) {
     } catch { await ctx.reply('❌ Failed to send.'); }
   });
 
-  // ── /addlink, /removelink, /listlinks ──
+  // Bot Links (owner-only global links)
   if (!db.links) db.links = {};
   saveDb();
 
@@ -2410,7 +1714,7 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(msg, { parse_mode: 'Markdown' });
   });
 
-  // ── /pesapal ──
+  // Pesapal
   if (!db.pesapal) db.pesapal = {};
   saveDb();
 
@@ -2454,7 +1758,76 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /encrypt ──
+  // Profile
+  botInstance.command('profile', async (ctx) => {
+    const userId = String(ctx.from.id);
+    ensureUser(userId);
+    const user = ctx.from;
+    const isPrem = isPremium(userId);
+    const pairs = getUserPairs(userId);
+    const pairedList = pairs.length ? pairs.map(p => `+${p.waNum}`).join(', ') : 'None';
+    const allVps = loadVPS();
+    const myVps = Object.entries(allVps).filter(([id, info]) => String(info.owner) === userId);
+    let vpsList = 'None';
+    if (myVps.length) {
+      vpsList = myVps.map(([id, info]) => `• ${info.hostname} (${info.ip || 'N/A'})`).join('\n');
+    }
+    const tokens = db.users[userId]?.tokens || 0;
+    const referrals = db.users[userId]?.referralsCount || 0;
+    const code = db.users[userId]?.referralCode || 'N/A';
+    const msg =
+      `👤 *Your Profile*\n\n` +
+      `🆔 ID: \`${userId}\`\n` +
+      `👤 Name: ${user.first_name || ''} ${user.last_name || ''}\n` +
+      `💎 Premium: ${isPrem ? '✅ Yes' : '❌ No'}\n` +
+      `📱 Paired Numbers: ${pairedList}\n` +
+      `🖥️ Your VPS:\n${vpsList}\n` +
+      `🔗 Referral Code: \`${code}\`\n` +
+      `💰 Tokens: ${tokens}\n` +
+      `👥 Referrals: ${referrals}`;
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+  });
+
+  // Clone Bot (public)
+  botInstance.command('clonebot', async (ctx) => {
+    const userId = String(ctx.from.id);
+    localStates.set(userId, { action: 'clonebot' });
+    await ctx.reply('🤖 *Please send me the bot token for the new bot.*\n\nToken format: `1234567890:ABCdef...`', { parse_mode: 'Markdown' });
+  });
+
+  botInstance.command('listclones', async (ctx) => {
+    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
+    if (clonedBots.size === 0) return ctx.reply('ℹ️ No cloned bots active.');
+    let msg = '*📋 Active Bot Instances:*\n';
+    for (const [key, info] of clonedBots) {
+      const status = info.isMain ? '(Main)' : '(Clone)';
+      const uptime = formatUptime(Date.now() - info.startTime);
+      msg += `• @${info.username} ${status} (uptime: ${uptime})\n`;
+    }
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+  });
+
+  botInstance.command('stopclone', async (ctx) => {
+    if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
+    const args = ctx.message.text.split(/\s+/);
+    if (args.length < 2) return ctx.reply('Usage: /stopclone <bot_username>');
+    const username = args[1].replace('@', '').trim();
+    const mainUsername = (await botInstance.telegram.getMe()).username;
+    if (username === 'main' || username === mainUsername) {
+      return ctx.reply('❌ Cannot stop the main bot.');
+    }
+    const info = clonedBots.get(username);
+    if (!info) return ctx.reply(`❌ No active bot with username @${username}.`);
+    try {
+      await info.botInstance.stop();
+      clonedBots.delete(username);
+      ctx.reply(`✅ Bot @${username} stopped.`);
+    } catch (err) {
+      ctx.reply(`❌ Error stopping: ${err.message}`);
+    }
+  });
+
+  // Encrypt
   botInstance.command('encrypt', async (ctx) => {
     const reply = ctx.message.reply_to_message;
     if (!reply || !reply.document) {
@@ -2484,7 +1857,7 @@ function setupBot(botInstance, options = {}) {
     );
   });
 
-  // ── /deobfuscate ──
+  // Deobfuscate
   botInstance.command('deobfuscate', async (ctx) => {
     const reply = ctx.message.reply_to_message;
     if (!reply || !reply.document) {
@@ -2508,7 +1881,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /checkfile ──
+  // Check File
   botInstance.command('checkfile', async (ctx) => {
     const reply = ctx.message.reply_to_message;
     if (!reply || !reply.document) {
@@ -2530,80 +1903,160 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /clonebot (only on main) ──
-  if (isMain) {
-    botInstance.command('clonebot', async (ctx) => {
-      const userId = String(ctx.from.id);
-
-      // Clear any existing timeout
-      if (localStates.has(userId)) {
-        const oldState = localStates.get(userId);
-        if (oldState.timeoutId) clearTimeout(oldState.timeoutId);
-      }
-
-      // Set 5‑minute timeout
-      const timeoutId = setTimeout(() => {
-        const state = localStates.get(userId);
-        if (state && state.action === 'clonebot') {
-          localStates.delete(userId);
-          ctx.telegram.sendMessage(
-            userId,
-            '⏰ *Clone request timed out.* Please start again with /clonebot.',
-            { parse_mode: 'Markdown' }
-          ).catch(() => {});
+  // Bug Report
+  botInstance.command('bugreport', async (ctx) => {
+    const description = ctx.message.text.replace(/^\/bugreport\s*/, '').trim();
+    if (!description) {
+      return ctx.reply('Usage: /bugreport <description of the bug>');
+    }
+    const user = ctx.from;
+    const userId = String(ctx.from.id);
+    const reportMsg = `🐛 *Bug Report*\n\n` +
+      `👤 User: ${user.first_name || ''} ${user.last_name || ''} (ID: \`${userId}\`)\n` +
+      `📝 Description:\n${description}`;
+    const reply = ctx.message.reply_to_message;
+    let fileToSend = null;
+    if (reply) {
+      if (reply.document) fileToSend = { type: 'document', file_id: reply.document.file_id };
+      else if (reply.photo) fileToSend = { type: 'photo', file_id: reply.photo[reply.photo.length-1].file_id };
+      else if (reply.video) fileToSend = { type: 'video', file_id: reply.video.file_id };
+      else if (reply.audio) fileToSend = { type: 'audio', file_id: reply.audio.file_id };
+    }
+    try {
+      const ownerId = settings.OWNER_TELEGRAM_ID;
+      if (fileToSend) {
+        if (fileToSend.type === 'document') {
+          await ctx.telegram.sendDocument(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
+        } else if (fileToSend.type === 'photo') {
+          await ctx.telegram.sendPhoto(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
+        } else if (fileToSend.type === 'video') {
+          await ctx.telegram.sendVideo(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
+        } else if (fileToSend.type === 'audio') {
+          await ctx.telegram.sendAudio(ownerId, fileToSend.file_id, { caption: reportMsg, parse_mode: 'Markdown' });
         }
-      }, 5 * 60 * 1000);
+      } else {
+        await ctx.telegram.sendMessage(ownerId, reportMsg, { parse_mode: 'Markdown' });
+      }
+      await ctx.reply('✅ Bug report sent to the developer. Thank you!');
+    } catch (err) {
+      await ctx.reply(`❌ Failed to send report: ${err.message}`);
+    }
+  });
 
-      localStates.set(userId, {
-        action: 'clonebot',
-        timeoutId: timeoutId,
-      });
+  // Buy VPS + Script
+  botInstance.command('buyvpswithscript', async (ctx) => {
+    registerUser(ctx.from.id, ctx.from.first_name);
+    if (!canUseBot(ctx.from.id)) {
+      return ctx.reply('🔒 *Premium-only mode* – contact owner.', { parse_mode: 'Markdown' });
+    }
+    const userId = String(ctx.from.id);
+    localStates.set(userId, { action: 'buyvps_username' });
+    await ctx.reply('🛒 *Enter username for your VPS:*\n\n(Only letters, numbers, underscore, min 3 chars)', { parse_mode: 'Markdown' });
+  });
 
-      await ctx.reply(
-        '🤖 *Please send me the bot token for the new bot.*\n\n' +
-        'Token format: `1234567890:ABCdef...`\n\n' +
-        '⏳ You have **5 minutes**. Type /cancel to abort.',
+  // Create Custom Bot
+  botInstance.command('createbot', async (ctx) => {
+    const args = ctx.message.text.split(/\s+/);
+    if (args.length < 2) {
+      return ctx.reply('Usage: /createbot <bot_name>\nExample: /createbot MySuperBot');
+    }
+    const name = args.slice(1).join(' ').trim();
+    if (!name || name.length < 3) {
+      return ctx.reply('❌ Bot name must be at least 3 characters.');
+    }
+    const sanitized = name.replace(/[^a-zA-Z0-9 _-]/g, '');
+    if (sanitized !== name) {
+      return ctx.reply('❌ Bot name can only contain letters, numbers, spaces, underscores, and hyphens.');
+    }
+    await ctx.reply(`⏳ Creating custom bot *${sanitized}*... This may take a moment.`, { parse_mode: 'Markdown' });
+    try {
+      const zipBuffer = await createCustomBot(sanitized);
+      await ctx.replyWithDocument(
+        { source: zipBuffer, filename: `${sanitized}-bot.zip` },
+        {
+          caption:
+            `✅ *Your custom bot is ready!*\n\nName: *${sanitized}*\n\n📦 *Next steps:*\n` +
+            `1. Extract the ZIP file.\n2. Edit \`settings.js\` with your credentials.\n3. Run \`npm install\` and \`npm start\`.\n\n⚠️ Keep your credentials safe!`,
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (err) {
+      await ctx.reply(`❌ Failed to create bot: ${err.message}`);
+    }
+  });
+
+  // Referral
+  botInstance.command('referral', async (ctx) => {
+    const userId = String(ctx.from.id);
+    ensureUser(userId);
+    const user = db.users[userId];
+    const code = user.referralCode || 'Not set';
+    const tokens = user.tokens || 0;
+    const referrals = user.referralsCount || 0;
+    await ctx.reply(
+      `🔗 *Your Referral Info*\n\nCode: \`${code}\`\nTokens: ${tokens}\nReferrals: ${referrals}\n\nShare your code: /refer ${code}\nEach successful referral gives you 1 token (worth $1 off).`,
+      { parse_mode: 'Markdown' }
+    );
+  });
+
+  botInstance.command('refer', async (ctx) => {
+    const args = ctx.message.text.split(/\s+/);
+    if (args.length < 2) {
+      return ctx.reply('Usage: /refer <code>\nExample: /refer ABC123');
+    }
+    const code = args[1].toUpperCase().trim();
+    const userId = String(ctx.from.id);
+    ensureUser(userId);
+    if (db.users[userId].referredBy) {
+      return ctx.reply('❌ You have already used a referral code.');
+    }
+    let referrerId = null;
+    for (const [id, data] of Object.entries(db.users)) {
+      if (data.referralCode === code && id !== userId) {
+        referrerId = id;
+        break;
+      }
+    }
+    if (!referrerId) {
+      return ctx.reply('❌ Invalid referral code.');
+    }
+    db.users[referrerId].tokens = (db.users[referrerId].tokens || 0) + 1;
+    db.users[userId].tokens = (db.users[userId].tokens || 0) + 1;
+    db.users[referrerId].referralsCount = (db.users[referrerId].referralsCount || 0) + 1;
+    db.users[userId].referredBy = referrerId;
+    saveDb();
+    await ctx.reply(
+      `✅ You received 1 token!\nYour referrer also received 1 token.\n\nNow you have ${db.users[userId].tokens} token(s). Use them to get discounts on panels.`,
+      { parse_mode: 'Markdown' }
+    );
+    try {
+      await ctx.telegram.sendMessage(
+        referrerId,
+        `🎉 Someone used your referral code!\nYou earned 1 token. Total tokens: ${db.users[referrerId].tokens}.`,
         { parse_mode: 'Markdown' }
       );
-    });
+    } catch {}
+  });
 
-    botInstance.command('listclones', async (ctx) => {
-      if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-      if (clonedBots.size === 0) return ctx.reply('ℹ️ No cloned bots active.');
-      let msg = '*📋 Active Bot Instances:*\n';
-      for (const [key, info] of clonedBots) {
-        const status = info.isMain ? '(Main)' : '(Clone)';
-        const uptime = formatUptime(Date.now() - info.startTime);
-        msg += `• @${info.username} ${status} (uptime: ${uptime})\n`;
+  // Bot Files
+  botInstance.command('botfiles', async (ctx) => {
+    const store = db.fileStore || [];
+    if (!store.length) {
+      return ctx.reply('📭 No bot files available at the moment. Check back later.');
+    }
+    const buttons = store.map(f => ([
+      Markup.button.callback(`📦 ${f.name}`, `download_file_${f.fileId}`)
+    ]));
+    await ctx.reply(
+      '📁 *Available Bot Files*\n\nClick a file to download it.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons)
       }
-      await ctx.reply(msg, { parse_mode: 'Markdown' });
-    });
+    );
+  });
 
-    botInstance.command('stopclone', async (ctx) => {
-      if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
-      const args = ctx.message.text.split(/\s+/);
-      if (args.length < 2) return ctx.reply('Usage: /stopclone <bot_username>');
-      const username = args[1].replace('@', '').trim();
-      const mainUsername = (await botInstance.telegram.getMe()).username;
-      if (username === 'main' || username === mainUsername) {
-        return ctx.reply('❌ Cannot stop the main bot.');
-      }
-      const info = clonedBots.get(username);
-      if (!info) return ctx.reply(`❌ No active bot with username @${username}.`);
-      try {
-        await info.botInstance.stop();
-        clonedBots.delete(username);
-        ctx.reply(`✅ Bot @${username} stopped.`);
-      } catch (err) {
-        ctx.reply(`❌ Error stopping: ${err.message}`);
-      }
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //   FILE STORE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────
-
+  // File Store Management
   botInstance.command('addstorefile', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const reply = ctx.message.reply_to_message;
@@ -2648,415 +2101,115 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`🗑️ File *${name}* removed from store.`, { parse_mode: 'Markdown' });
   });
 
-  // ── Download file callback ──
-  botInstance.action(/download_file_(.+)/, async (ctx) => {
-    await ctx.answerCbQuery('Downloading...');
-    const fileId = ctx.match[1];
-    const file = db.fileStore.find(f => f.fileId === fileId);
-    if (!file) return ctx.reply('❌ File not found.');
-    await ctx.replyWithDocument(fileId, {
-      caption: `📦 *${file.name}*\n${file.description || ''}`,
-      parse_mode: 'Markdown'
-    });
-  });
-
   // ─────────────────────────────────────────────────────────────
-  //   MESSAGE HANDLER (keyboard buttons & states)
+  //   MESSAGE HANDLER (for button clicks)
   // ─────────────────────────────────────────────────────────────
   botInstance.on('message', async (ctx, next) => {
     if (!ctx.message || !ctx.message.text) return next();
     const text = ctx.message.text;
     const userId = String(ctx.from.id);
 
-    // ── Check banned ──
-    if (db.bannedUsers && db.bannedUsers.includes(userId)) {
-      return ctx.reply('⛔ You are banned from using this bot.');
+    // ── Pair Samsung ──
+    if (text === '𝑷𝑨𝑰𝑹 𝑺𝑨𝑴𝑺𝑼𝑵𝑮 𝑿𝑴𝑫') {
+      localStates.set(userId, { action: 'pair', bot: 'samsung' });
+      return ctx.reply('📱 *Enter phone number to pair with Samsung XMD:*\n\nFormat: `254700000000` (without +)', { parse_mode: 'Markdown' });
     }
 
-    // ── Keyboard buttons ──
-
-    // Row 1: Pair — redirect to web
-    if (text === '𝑷𝑨𝑰𝑹 𝑺𝑨𝑴𝑺𝑼𝑵𝑮 𝑴𝑫 𝑷𝑹𝑬𝑴𝑰𝑼𝑴') {
-      const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
-      await ctx.reply(
-        `🌐 *Web Pairing*\n\nPair your WhatsApp device through our web page.\nIt's fast, easy, and works from any browser.\n\n🔗 [Open Pairing Page](${pairingUrl})\n\nSimply visit the link and enter your phone number to get a pairing code!`,
-        { parse_mode: 'Markdown' }
-      );
-      return;
+    // ── Pair FBI ──
+    if (text === '𝑷𝑨𝑰𝑹 𝑭𝑩𝑰 𝑿𝑴𝑫') {
+      localStates.set(userId, { action: 'pair', bot: 'fbi' });
+      return ctx.reply('📱 *Enter phone number to pair with FBI XMD:*\n\nFormat: `254700000000` (without +)', { parse_mode: 'Markdown' });
     }
 
-    // Row 2: Generate Session ID
-    if (text === '𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑬 𝑺𝑬𝑺𝑺𝑰𝑶𝑵 𝑰𝑫') {
-      const uid = String(ctx.from.id);
-      const sessionId = `wa_${uid}_${Date.now()}`;
-      await ctx.reply(
-        `📂 *Your Session ID:*\n\`${sessionId}\`\n\n` +
-        `You can use this with "Use Existing Session ID" later.\n` +
-        `It's also stored in the \`sessions/\` folder if you want to back it up.`,
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
-
-    // Row 3: Buy Panel (full width)
-    if (text === '𝑩𝑼𝒀 𝑷𝑨𝑵𝑬𝑳') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/buypanel');
-      return;
-    }
-
-    // Row 4: Buy Admin Panel (full width)
-    if (text === '𝑩𝑼𝒀 𝑨𝑫𝑴𝑰𝑵 𝑷𝑨𝑵𝑬𝑳') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/cpanel');
-      return;
-    }
-
-    // Row 5: Del Pair & Refresh
+    // ── Del Pair ──
     if (text === '𝑫𝑬𝑳 𝑷𝑨𝑰𝑹') {
-      const pairingUrl = process.env.PAIRING_PAGE_URL || 'https://your-pairing-site.vercel.app';
       localStates.set(userId, { action: 'delpair' });
-      await ctx.reply(
-        `🗑️ *Enter phone number to delete:*\n\nFormat: \`254700000000\`\n\nOr manage your pairs on the web:\n🔗 [Web Pairing](${pairingUrl})`,
-        { parse_mode: 'Markdown' }
-      );
-      return;
+      return ctx.reply('🗑️ *Enter phone number to delete:*\n\nFormat: `254700000000`', { parse_mode: 'Markdown' });
     }
 
-    if (text === '𝑹𝑬𝑭𝑹𝑬𝑺𝑯 𝑺𝑬𝑺𝑺𝑰𝑶𝑵') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/refreshsession');
-      return;
+    // ── Buy Panel ──
+    if (text === '𝑩𝑼𝒀 𝑷𝑨𝑵𝑬𝑳') {
+      localStates.set(userId, { action: 'buypanel_username' });
+      return ctx.reply('🛒 *Enter username for your VPS:*\n\n(Only letters, numbers, underscore, min 3 chars)', { parse_mode: 'Markdown' });
     }
 
-    // Row 6: Buy + Script & Verify
-    if (text === '𝑩𝑼𝒀 + 𝑺𝑪𝑹𝑰𝑷𝑻') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/buyvpswithscript');
-      return;
-    }
-
-    if (text === '𝑽𝑬𝑹𝑰𝑭𝒀 𝑷𝑨𝒀') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/verifypayment');
-      return;
-    }
-
-    // Row 7: VPS Menu & Install Menu
-    if (text === '𝑽𝑷𝑺 𝑴𝑬𝑵𝑼') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/cvps');
-      return;
-    }
-
-    if (text === '𝑰𝑵𝑺𝑻𝑨𝑳𝑳 𝑴𝑬𝑵𝑼') {
-      await ctx.reply(
-        '📦 *Install Menu*\n\n' +
-        '/installpanel\n/subdo\n/listsubdo\n/delallsubdo\n/swings\n/installtema\n/uninstalltema\n/uninstallwings\n/uninstallpanel\n/hbpanel\n/buyprotectpanel\n/installprotectprem',
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
-
-    // Row 8: Owner Menu & Profile
-    if (text === '𝑶𝑾𝑵𝑬𝑹 𝑴𝑬𝑵𝑼') {
-      await ctx.reply(
-        '👑 *Owner Commands*\n\n' +
-        '/listprem\n/addprem\n/delprem\n/premonly\n/addowner\n/delown\n/listown\n/adminpanel\n/broadcast\n/withdraw\n/addlink\n/removelink\n/listlinks\n/setpesapal\n/addstorefile\n/liststorefiles\n/removestorefile\n/clonebot\n/listclones\n/stopclone\n/setprice\n/bulkpanels\n/addcmd\n/delcmd\n/listcmd\n/ban\n/unban',
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
-
-    if (text === '𝑴𝒀 𝑷𝑹𝑶𝑭𝑰𝑳𝑬') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/profile');
-      return;
-    }
-
-    // Row 9: Create Bot & Report Bug
-    if (text === '𝑪𝑹𝑬𝑨𝑻𝑬 𝑩𝑶𝑻') {
-      await ctx.reply(
-        '🤖 *Create a custom WhatsApp bot*\n\n' +
-        'Send the name you want for your bot:\n`/createbot <name>`\n\n' +
-        'Example: `/createbot MySuperBot`',
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
-
-    if (text === '𝑹𝑬𝑷𝑶𝑹𝑻 𝑩𝑼𝑮') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/bugreport');
-      return;
-    }
-
-    // Row 10: Bot Files & My Tokens
-    if (text === '𝑩𝑶𝑻 𝑭𝑰𝑳𝑬𝑺') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/botfiles');
-      return;
-    }
-
-    if (text === '𝑴𝒀 𝑻𝑶𝑲𝑬𝑵𝑺') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/referral');
-      return;
-    }
-
-    // Row 11: My Panels & Clone Bot
-    if (text === '𝑴𝒀 𝑷𝑨𝑵𝑬𝑳𝑺') {
-      await ctx.telegram.sendMessage(ctx.chat.id, '/mypanels');
-      return;
-    }
-
+    // ── Clone Bot ──
     if (text === '𝑪𝑳𝑶𝑵𝑬 𝑩𝑶𝑻') {
-      if (!isMain) return ctx.reply('❌ Cloning is only available on the main bot.');
-      await ctx.telegram.sendMessage(ctx.chat.id, '/clonebot');
-      return;
+      localStates.set(userId, { action: 'clonebot' });
+      return ctx.reply('🤖 *Please send me the bot token for the new bot.*\n\nToken format: `1234567890:ABCdef...`', { parse_mode: 'Markdown' });
     }
 
-    // ── State handling ──
-    const state = localStates.get(userId);
-    if (state) {
-      await handleUserState(ctx, state, text);
-      return;
+    // ── Admin Panel ──
+    if (text === '𝑨𝑫𝑴𝑰𝑵 𝑷𝑨𝑵𝑬𝑳') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/adminpanel');
     }
 
-    // ── Dynamic custom commands ──
-    if (text.startsWith('/')) {
-      const cmd = text.split(/\s+/)[0].slice(1);
-      if (db.customCommands && db.customCommands[cmd]) {
-        const entry = db.customCommands[cmd];
-        if (entry.ownerOnly && !isOwner(ctx.from.id)) {
-          return ctx.reply('❌ Owner only.');
-        }
-        try {
-          const result = eval(entry.code);
-          await ctx.reply(result || '✅ Done.');
-        } catch (e) {
-          await ctx.reply(`❌ Error: ${e.message}`);
-        }
-        return;
-      }
+    // ── Help ──
+    if (text === '𝑯𝑬𝑳𝑷') {
+      // You can send a help text or command
+      return ctx.telegram.sendMessage(ctx.chat.id, '/help');
     }
 
+    // ── Verify Payment ──
+    if (text === '𝑽𝑬𝑹𝑰𝑭𝒀 𝑷𝑨𝒀𝑴𝑬𝑵𝑻') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/verifypayment');
+    }
+
+    // ── VPS Menu ──
+    if (text === '𝑽𝑷𝑺 𝑴𝑬𝑵𝑼') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/cvps');
+    }
+
+    // ── Install Menu ──
+    if (text === '𝑰𝑵𝑺𝑻𝑨𝑳𝑳 𝑴𝑬𝑵𝑼') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '📦 *Install Menu*\n\n/installpanel\n/subdo\n/listsubdo\n/delallsubdo\n/swings\n/installtema\n/uninstalltema\n/uninstallwings\n/uninstallpanel\n/hbpanel\n/buyprotectpanel\n/installprotectprem', { parse_mode: 'Markdown' });
+    }
+
+    // ── Owner Menu ──
+    if (text === '𝑶𝑾𝑵𝑬𝑹 𝑴𝑬𝑵𝑼') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '👑 *Owner Commands*\n\n/listprem\n/addprem\n/delprem\n/premonly\n/addowner\n/delown\n/listown\n/adminpanel\n/broadcast\n/withdraw\n/addlink\n/removelink\n/listlinks\n/setpesapal\n/addstorefile\n/liststorefiles\n/removestorefile\n/clonebot\n/listclones\n/stopclone', { parse_mode: 'Markdown' });
+    }
+
+    // ── Pay with Pesapal ──
+    if (text === '𝑷𝑨𝒀 𝑾𝑰𝑻𝑯 𝑷𝑬𝑺𝑨𝑷𝑨𝑳') {
+      localStates.set(userId, { action: 'pesapal' });
+      return ctx.reply('💳 *Enter the amount you want to pay (in your currency):*\n\nExample: `500`', { parse_mode: 'Markdown' });
+    }
+
+    // ── My Profile ──
+    if (text === '𝑴𝒀 𝑷𝑹𝑶𝑭𝑰𝑳𝑬') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/profile');
+    }
+
+    // ── Create Bot ──
+    if (text === '𝑪𝑹𝑬𝑨𝑻𝑬 𝑩𝑶𝑻') {
+      return ctx.reply('🤖 *Create a custom WhatsApp bot*\n\nSend the name you want for your bot:\n`/createbot <name>`\n\nExample: `/createbot MySuperBot`', { parse_mode: 'Markdown' });
+    }
+
+    // ── Bot Files ──
+    if (text === '𝑩𝑶𝑻 𝑭𝑰𝑳𝑬𝑺') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/botfiles');
+    }
+
+    // ── Report Bug ──
+    if (text === '𝑹𝑬𝑷𝑶𝑹𝑻 𝑩𝑼𝑮') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/bugreport');
+    }
+
+    // ── My Tokens ──
+    if (text === '𝑴𝒀 𝑻𝑶𝑲𝑬𝑵𝑺') {
+      return ctx.telegram.sendMessage(ctx.chat.id, '/referral');
+    }
+
+    // If no button matches, continue to other commands
     return next();
   });
 
   // ─────────────────────────────────────────────────────────────
-  //   STATE HANDLER
+  //   CALLBACK ACTIONS (for panel RAM selection etc.)
   // ─────────────────────────────────────────────────────────────
-  async function handleUserState(ctx, state, text) {
-    const userId = String(ctx.from.id);
-    const bot = ctx.telegram;
 
-    switch (state.action) {
-      case 'pair': {
-        const phone = text.replace(/\D/g, '');
-        if (!phone || phone.length < 7) {
-          return ctx.reply('❌ Invalid phone number. Use format: 254700000000');
-        }
-        await ctx.reply(`🔄 Pairing +${phone}...`);
-        const uid = String(ctx.from.id);
-        const sessionId = `wa_${uid}_${phone}`;
-        if (activeSockets.has(sessionId)) {
-          return ctx.reply(`✅ +${phone} already connected!`);
-        }
-        if (sessionExists(sessionId)) {
-          await ctx.reply(`♻️ Reconnecting +${phone}...`);
-          await startWhatsApp(sessionId, ctx.chat.id, null, uid);
-          return;
-        }
-        await startWhatsApp(sessionId, ctx.chat.id, phone, uid);
-        break;
-      }
-
-      case 'restore_session': {
-        const sessionId = text.trim();
-        if (!sessionId.startsWith('wa_') || !/\d/.test(sessionId)) {
-          return ctx.reply(
-            '❌ Invalid Session ID format.\nIt should start with `wa_` and contain numbers.\nExample: `wa_123456789_254700000000`',
-            { parse_mode: 'Markdown' }
-          );
-        }
-        const uid = String(ctx.from.id);
-        const pairs = getUserPairs(uid);
-        if (pairs.find(p => p.sessionId === sessionId)) {
-          return ctx.reply(`ℹ️ Session \`${sessionId}\` is already paired with your account.`, { parse_mode: 'Markdown' });
-        }
-        if (!sessionExists(sessionId)) {
-          const downloaded = await downloadSessionFromGitHub(sessionId);
-          if (!downloaded) {
-            return ctx.reply('❌ Session not found locally or on GitHub. Please pair a new device instead.');
-          }
-        }
-        if (activeSockets.has(sessionId)) {
-          return ctx.reply(`✅ Session \`${sessionId}\` is already active.`, { parse_mode: 'Markdown' });
-        }
-        await ctx.reply(`🔄 Restoring session \`${sessionId}\`...`, { parse_mode: 'Markdown' });
-        const waNum = sessionId.split('_').pop();
-        if (waNum && /^\d{7,}$/.test(waNum)) {
-          addPair(uid, sessionId, waNum);
-        }
-        await startWhatsApp(sessionId, ctx.chat.id, null, uid);
-        break;
-      }
-
-      case 'delpair': {
-        const phone = text.replace(/\D/g, '');
-        if (!phone || phone.length < 7) return ctx.reply('❌ Invalid phone number.');
-        const uid = String(ctx.from.id);
-        const sessionId = `wa_${uid}_${phone}`;
-        const sock = activeSockets.get(sessionId);
-        if (sock) {
-          try { await sock.logout(); } catch {}
-          try { sock.ws?.close(); } catch {}
-          activeSockets.delete(sessionId);
-        }
-        notifiedConnected.delete(sessionId);
-        removePair(uid, sessionId);
-        deleteSession(sessionId);
-        deleteSessionFromGitHub(sessionId).catch(() => {});
-        await ctx.reply(`🗑️ +${phone} deleted.`);
-        break;
-      }
-
-      case 'buypanel_username': {
-        const username = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        if (!username || username.length < 3) {
-          return ctx.reply('❌ Username must be at least 3 chars (letters, numbers, underscore).');
-        }
-        const sessionKey = `tg_${ctx.from.id}_buypanel`;
-        if (!global._pendingTelegram) global._pendingTelegram = {};
-        global._pendingTelegram[sessionKey] = { username, isAdmin: false };
-        await showRamSelection(ctx, sessionKey, username, false);
-        break;
-      }
-
-      case 'cpanel_username': {
-        const username = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        if (!username || username.length < 3) {
-          return ctx.reply('❌ Username must be at least 3 chars.');
-        }
-        const sessionKey = `tg_${ctx.from.id}_cpanel`;
-        if (!global._pendingTelegram) global._pendingTelegram = {};
-        global._pendingTelegram[sessionKey] = { username, isAdmin: true };
-        await showRamSelection(ctx, sessionKey, username, false);
-        break;
-      }
-
-      case 'clonebot': {
-        if (state.timeoutId) clearTimeout(state.timeoutId);
-        const token = text.trim();
-        if (!token || !token.includes(':')) {
-          return ctx.reply('❌ Invalid token format. Please send a valid bot token.');
-        }
-        try {
-          const testBot = new Telegraf(token);
-          const me = await testBot.telegram.getMe();
-          if (clonedBots.has(me.username)) {
-            return ctx.reply(`⚠️ A bot with username @${me.username} is already running.`);
-          }
-          const newBot = new Telegraf(token);
-          setupBot(newBot, { isMain: false });
-          await newBot.launch();
-          clonedBots.set(me.username, {
-            username: me.username,
-            token: token,
-            botInstance: newBot,
-            startTime: Date.now(),
-            isMain: false,
-          });
-          await ctx.reply(
-            `✅ *New bot @${me.username} is now active!*\n\n` +
-            `It has all the same features, except cloning.\n` +
-            `Use /stopclone @${me.username} to stop it.`,
-            { parse_mode: 'Markdown' }
-          );
-        } catch (err) {
-          await ctx.reply(`❌ Failed to launch clone: ${err.message}`);
-        }
-        break;
-      }
-
-      default:
-        return ctx.reply('❌ Unknown action. Please start again.');
-    }
-    localStates.delete(userId);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //   BROADCAST HANDLER
-  // ─────────────────────────────────────────────────────────────
-  botInstance.on('message', async (ctx, next) => {
-    if (!ctx.message) return next();
-    const userId = String(ctx.from.id);
-
-    if (broadcastPending.has(userId) && ctx.message.text !== '/cancel') {
-      broadcastPending.delete(userId);
-      const msg = ctx.message;
-      const users = Object.keys(db.users);
-      if (!users.length) {
-        return ctx.reply('❌ No users to broadcast to.');
-      }
-
-      await ctx.reply(`📢 Broadcasting to ${users.length} users...`);
-
-      let success = 0, fail = 0;
-      for (const uid of users) {
-        try {
-          await sendBroadcastToUser(uid, msg, ctx.telegram);
-          success++;
-        } catch {
-          fail++;
-        }
-        // Small delay to avoid hitting rate limits
-        await new Promise(r => setTimeout(r, 100));
-      }
-
-      await ctx.reply(`✅ Broadcast complete!\nSent: ${success}\nFailed: ${fail}`);
-      return;
-    }
-
-    return next();
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  //   BROADCAST HELPER
-  // ─────────────────────────────────────────────────────────────
-  async function sendBroadcastToUser(uid, msg, telegram) {
-    const rawText = msg.text || msg.caption || '';
-    const { clean, markup } = parseBroadcastButtons(rawText);
-    const extra = { parse_mode: 'Markdown', ...(markup || {}) };
-
-    if (msg.sticker) return telegram.sendSticker(uid, msg.sticker.file_id, markup ? { reply_markup: markup.reply_markup } : {});
-    if (msg.animation) return telegram.sendAnimation(uid, msg.animation.file_id, { caption: clean, ...extra });
-    if (msg.video_note) return telegram.sendVideoNote(uid, msg.video_note.file_id);
-    if (msg.voice) return telegram.sendVoice(uid, msg.voice.file_id, { caption: clean, ...extra });
-    if (msg.photo) return telegram.sendPhoto(uid, msg.photo[msg.photo.length - 1].file_id, { caption: clean, ...extra });
-    if (msg.video) return telegram.sendVideo(uid, msg.video.file_id, { caption: clean, ...extra });
-    if (msg.audio) return telegram.sendAudio(uid, msg.audio.file_id, { caption: clean, ...extra });
-    if (msg.document) return telegram.sendDocument(uid, msg.document.file_id, { caption: clean, ...extra });
-    return telegram.sendMessage(uid, clean || msg.text, extra);
-  }
-
-  function parseBroadcastButtons(text) {
-    if (!text) return { clean: text || '', markup: null };
-    const btnRegex = /\[([^\]|]+)\|([^\]]+)\]/g;
-    const rows = [];
-    let currentRow = [];
-    let clean = text;
-    let match;
-    const matches = [];
-    while ((match = btnRegex.exec(text)) !== null) matches.push(match);
-    if (!matches.length) return { clean: text, markup: null };
-    for (let i = 0; i < matches.length; i++) {
-      const m = matches[i];
-      const label = m[1].trim();
-      const url = m[2].trim();
-      const before = i === 0 ? text.slice(0, m.index) : text.slice(matches[i-1].index + matches[i-1][0].length, m.index);
-      if (i > 0 && before.includes('\n')) { if (currentRow.length) rows.push(currentRow); currentRow = []; }
-      currentRow.push(Markup.button.url(label, url));
-    }
-    if (currentRow.length) rows.push(currentRow);
-    clean = text.replace(/\[([^\]|]+)\|([^\]]+)\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    return { clean, markup: rows.length ? Markup.inlineKeyboard(rows) : null };
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //   PANEL RAM SELECTION CALLBACKS
-  // ─────────────────────────────────────────────────────────────
+  // Panel RAM selection
   botInstance.action(/panel_ram_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     const ramKey = ctx.match[1];
@@ -3077,6 +2230,7 @@ function setupBot(botInstance, options = {}) {
     await handleTokenChoice(ctx, userId, sessionKey, spec, false);
   });
 
+  // VPS RAM selection
   botInstance.action(/vps_ram_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     const ramKey = ctx.match[1];
@@ -3088,10 +2242,10 @@ function setupBot(botInstance, options = {}) {
       return ctx.reply('❌ Session expired. Please start again with /buyvpswithscript.');
     }
     const vpsSpecsMap = {
-      '1gb': { ram: 1024, price: 5000, size: 's-1vcpu-1gb' },
-      '2gb': { ram: 2048, price: 10000, size: 's-1vcpu-2gb' },
-      '4gb': { ram: 4096, price: 20000, size: 's-2vcpu-4gb' },
-      '8gb': { ram: 8192, price: 40000, size: 's-4vcpu-8gb' },
+      '1gb': { ram: 1024, price: 5, size: 's-1vcpu-1gb' },
+      '2gb': { ram: 2048, price: 10, size: 's-1vcpu-2gb' },
+      '4gb': { ram: 4096, price: 20, size: 's-2vcpu-4gb' },
+      '8gb': { ram: 8192, price: 40, size: 's-4vcpu-8gb' },
     };
     const spec = vpsSpecsMap[ramKey];
     if (!spec) return ctx.reply('❌ Invalid RAM option.');
@@ -3099,6 +2253,7 @@ function setupBot(botInstance, options = {}) {
     await handleTokenChoice(ctx, userId, sessionKey, spec, true);
   });
 
+  // Token usage
   botInstance.action(/token_use_(\d+)_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     const discount = parseInt(ctx.match[1]);
@@ -3136,6 +2291,7 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply('❌ Purchase cancelled.');
   });
 
+  // Verify payment callback
   botInstance.action(/verify_panel_payment_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     const reference = ctx.match[1];
@@ -3144,9 +2300,7 @@ function setupBot(botInstance, options = {}) {
     await verifyAndCreatePanel(ctx, reference, pending);
   });
 
-  // ─────────────────────────────────────────────────────────────
-  //   BUY VPS WITH SCRIPT CALLBACKS
-  // ─────────────────────────────────────────────────────────────
+  // Buy VPS upload/store/skip
   botInstance.action('buyvps_upload', async (ctx) => {
     await ctx.answerCbQuery();
     const userId = String(ctx.from.id);
@@ -3219,15 +2373,21 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply('❌ Purchase cancelled.');
   });
 
-  // ─────────────────────────────────────────────────────────────
-  //   VPS COMMANDS & CALLBACKS (DigitalOcean)
-  // ─────────────────────────────────────────────────────────────
+  // Download file from store
+  botInstance.action(/download_file_(.+)/, async (ctx) => {
+    await ctx.answerCbQuery('Downloading...');
+    const fileId = ctx.match[1];
+    const file = db.fileStore.find(f => f.fileId === fileId);
+    if (!file) return ctx.reply('❌ File not found.');
+    await ctx.replyWithDocument(fileId, {
+      caption: `📦 *${file.name}*\n${file.description || ''}`,
+      parse_mode: 'Markdown'
+    });
+  });
 
-  // ── /cvps (Create VPS) ──
+  // VPS creation callbacks (interactive)
   botInstance.command('cvps', async (ctx) => {
-    if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) {
-      return ctx.reply('❌ Owner/Premium only.');
-    }
+    if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const keyboard = [
       [{ text: "🌎 Digital Ocean 1", callback_data: "createvps_1" }],
       [{ text: "🌎 Digital Ocean 2", callback_data: "createvps_2" }],
@@ -3239,7 +2399,6 @@ function setupBot(botInstance, options = {}) {
     });
   });
 
-  // ── VPS Creation Callbacks ──
   botInstance.action(/createvps_([1-3])/, async (ctx) => {
     await ctx.answerCbQuery();
     const accId = ctx.match[1];
@@ -3312,7 +2471,7 @@ function setupBot(botInstance, options = {}) {
       const dropletId = await createVPSDroplet(apiKey, hostname, vpsSpecs[specId].size, imageId, regionId, password);
       let ipAddress = null;
       while (!ipAddress) {
-        await new Promise(r => setTimeout(r, 5000));
+        await sleep(5000);
         const droplet = await getDropletInfo(apiKey, dropletId);
         ipAddress = droplet?.networks?.v4?.find(n => n.type === 'public')?.ip_address || null;
       }
@@ -3331,7 +2490,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /listvps ──
+  // VPS List
   botInstance.command('listvps', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const keyboard = [
@@ -3407,7 +2566,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /cekip ──
+  // Check VPS IP
   botInstance.command('cekip', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3453,7 +2612,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /delvps ──
+  // Delete VPS
   botInstance.command('delvps', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3518,7 +2677,7 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply('❌ Delete cancelled.');
   });
 
-  // ── /svps (Start VPS) ──
+  // Start VPS
   botInstance.command('svps', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3552,7 +2711,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /stopvps ──
+  // Stop VPS
   botInstance.command('stopvps', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3586,7 +2745,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /statusdo ──
+  // Status DO
   botInstance.command('statusdo', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const keyboard = [
@@ -3623,7 +2782,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /setpwvps ──
+  // Set VPS Password
   botInstance.command('setpwvps', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3648,7 +2807,11 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ipvps, port: 22, username: 'root', password: oldpw });
   });
 
-  // ── /installpanel ──
+  // ─────────────────────────────────────────────────────────────
+  //   INSTALLATION COMMANDS (unchanged)
+  // ─────────────────────────────────────────────────────────────
+
+  // Install Panel
   botInstance.command('installpanel', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3670,7 +2833,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /subdo ──
+  // Subdomain
   botInstance.command('subdo', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3709,7 +2872,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /listsubdo ──
+  // List Subdomains
   botInstance.command('listsubdo', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const domains = Object.keys(global.subdomain);
@@ -3718,7 +2881,7 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`📜 *Available Domains*\n\n${list}`, { parse_mode: 'Markdown' });
   });
 
-  // ── /delallsubdo ──
+  // Delete All Subdomains
   botInstance.command('delallsubdo', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3740,7 +2903,7 @@ function setupBot(botInstance, options = {}) {
     for (const rec of dns.records) {
       const del = await deleteDNSRecord(tld, rec.id);
       if (del.success) success++; else fail++;
-      await new Promise(r => setTimeout(r, 500));
+      await sleep(500);
     }
     await ctx.reply(`✅ *Deletion Results*\n\n🌎 Domain: ${tld}\n✅ Success: ${success}\n❌ Failed: ${fail}`, { parse_mode: 'Markdown' });
   });
@@ -3758,12 +2921,12 @@ function setupBot(botInstance, options = {}) {
     for (const rec of dns.records) {
       const del = await deleteDNSRecord(tld, rec.id);
       if (del.success) success++; else fail++;
-      await new Promise(r => setTimeout(r, 500));
+      await sleep(500);
     }
     await ctx.reply(`✅ *Deletion Results*\n\n🌎 Domain: ${tld}\n✅ Success: ${success}\n❌ Failed: ${fail}`, { parse_mode: 'Markdown' });
   });
 
-  // ── /swings ──
+  // Start Wings
   botInstance.command('swings', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3783,7 +2946,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /installtema ──
+  // Install Theme
   botInstance.command('installtema', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3799,6 +2962,7 @@ function setupBot(botInstance, options = {}) {
     await ctx.reply(`🎨 *Select Theme*\n📡 IP: ${ip}`, { ...Markup.inlineKeyboard(keyboard) });
   });
 
+  // Theme installation helper (defined inside setupBot)
   async function installTheme(ip, password, scriptUrl, ctx) {
     const conn = new Client();
     await ctx.reply(`⏳ Installing theme...`);
@@ -3837,7 +3001,7 @@ function setupBot(botInstance, options = {}) {
     await installTheme(ip, password, 'https://raw.githubusercontent.com/NoPro200/Pterodactyl_Nightcore_Theme/main/install.sh', ctx);
   });
 
-  // ── /uninstalltema ──
+  // Uninstall Theme
   botInstance.command('uninstalltema', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3863,7 +3027,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /uninstallwings ──
+  // Uninstall Wings
   botInstance.command('uninstallwings', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3883,7 +3047,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /uninstallpanel ──
+  // Uninstall Panel
   botInstance.command('uninstallpanel', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3910,7 +3074,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /hbpanel ──
+  // Hackback Panel (reset admin)
   botInstance.command('hbpanel', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3941,7 +3105,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /antiddos ──
+  // Antiddos (Cloudflare)
   botInstance.command('antiddos', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3961,7 +3125,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /buyprotectpanel ──
+  // Buy Protect Panel
   botInstance.command('buyprotectpanel', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -3989,7 +3153,7 @@ function setupBot(botInstance, options = {}) {
     conn.connect({ host: ip, port: 22, username: 'root', password });
   });
 
-  // ── /withdraw ──
+  // Withdraw (Atlantic)
   botInstance.command('withdraw', async (ctx) => {
     if (!isOwner(ctx.from.id)) return ctx.reply('❌ Owner only.');
     const apiKey = settings.apiAtlantic;
@@ -4020,7 +3184,7 @@ function setupBot(botInstance, options = {}) {
     }
   });
 
-  // ── /installprotectprem ──
+  // Install Protect Premium (11 scripts)
   botInstance.command('installprotectprem', async (ctx) => {
     if (!isOwner(ctx.from.id) && !isPremium(ctx.from.id)) return ctx.reply('❌ Owner/Premium only.');
     const args = ctx.message.text.split(/\s+/);
@@ -4055,127 +3219,376 @@ function setupBot(botInstance, options = {}) {
     console.error('Bot error:', err);
     ctx.reply('An error occurred.').catch(() => {});
   });
-}
+} // end setupBot
 
 // ─────────────────────────────────────────────────────────────
-//   SESSION WATCHER & PING
+//   HELPER FUNCTIONS (outside setupBot)
 // ─────────────────────────────────────────────────────────────
 
-function startSessionWatcher() {
-  setInterval(async () => {
-    try {
-      const { status, body } = await ghRequest('GET', '');
-      if (status !== 200 || !Array.isArray(body)) return;
-      const sessionIds = new Set();
-      for (const item of body) {
-        const m = item.path.match(/^sessions\/([^\/]+)\/creds\.json$/);
-        if (m) sessionIds.add(m[1]);
-      }
-      for (const sid of sessionIds) {
-        if (activeSockets.has(sid)) continue;
-        if (!sessionExists(sid)) {
-          logInfo('WATCHER', `New session detected: ${sid}`);
-          await downloadSessionFromGitHub(sid);
-        }
-        if (sessionExists(sid) && !activeSockets.has(sid)) {
-          logInfo('WATCHER', `Starting: ${sid}`);
-          let tgUserId = null;
-          const allPairs = getAllPairs();
-          for (const [uid, pairs] of Object.entries(allPairs)) {
-            if (pairs.find(p => p.sessionId === sid)) { tgUserId = uid; break; }
-          }
-          notifiedConnected.add(sid);
-          startWhatsApp(sid, null, null, tgUserId).catch(e => logError('WATCHER', e.message));
-        }
-      }
-    } catch {}
-  }, 30000);
-  logSuccess('WATCHER', 'Live session watcher started (30s interval)');
-}
+// State handler (for interactive actions)
+async function handleUserState(ctx, state, text, localStates) {
+  const userId = String(ctx.from.id);
+  const botInstance = ctx.telegram;
 
-function startPingLoop() {
-  const urls = [settings.PANEL_URL, settings.WEBSITE_URL].filter(Boolean);
-  http.createServer((req, res) => {
-    const uptime = formatUptime(Date.now() - global.botStartTime);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'alive', uptime, sessions: activeSockets.size }));
-  }).listen(process.env.PORT || 3001, () => {
-    logSuccess('PING', `Health server :${process.env.PORT || 3001}`);
-  });
-  setInterval(() => {
-    const uptime = formatUptime(Date.now() - global.botStartTime);
-    process.stdout.write(chalk.gray(`[UPTIME] ${uptime}\n`));
-    for (const url of urls) {
+  switch (state.action) {
+    case 'pair': {
+      const phone = text.replace(/\D/g, '');
+      if (!phone || phone.length < 7) {
+        return ctx.reply('❌ Invalid phone number. Use format: 254700000000');
+      }
+      const bot = state.bot; // 'samsung' or 'fbi'
+      const socket = global.botSockets.get(bot);
+      if (!socket) {
+        return ctx.reply(`❌ ${bot === 'samsung' ? 'Samsung XMD' : 'FBI XMD'} is currently offline. Please try again later.`);
+      }
       try {
-        const parsed = new URL(url);
-        const mod = parsed.protocol === 'https:' ? https : http;
-        const req = mod.get(url, res => logInfo('PING', `${url} → ${res.statusCode}`));
-        req.on('error', () => {});
-        req.setTimeout(8000, () => req.destroy());
-      } catch {}
+        const code = await socket.requestPairingCode(phone, 'BLACKSKY');
+        const botName = bot === 'samsung' ? 'Samsung XMD' : 'FBI XMD';
+        await ctx.reply(
+          `🔑 *Pairing Code for +${phone} using ${botName}*\n\n\`${code}\`\n\nOpen WhatsApp → Linked Devices → Link a device → Link with phone number`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (err) {
+        await ctx.reply(`❌ Pairing failed: ${err.message}`);
+      }
+      localStates.delete(userId);
+      break;
     }
-  }, 4 * 60 * 1000);
+    case 'delpair': {
+      const phone = text.replace(/\D/g, '');
+      if (!phone || phone.length < 7) return ctx.reply('❌ Invalid phone number.');
+      const uid = String(ctx.from.id);
+      const sessionId = `wa_${uid}_${phone}`;
+      const sock = activeSockets.get(sessionId);
+      if (sock) {
+        try { await sock.logout(); } catch {}
+        try { sock.ws?.close(); } catch {}
+        activeSockets.delete(sessionId);
+      }
+      notifiedConnected.delete(sessionId);
+      removePair(uid, sessionId);
+      deleteSession(sessionId);
+      deleteSessionFromGitHub(sessionId).catch(() => {});
+      await ctx.reply(`🗑️ +${phone} deleted.`);
+      break;
+    }
+    case 'buypanel_username': {
+      const username = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      if (!username || username.length < 3) return ctx.reply('❌ Username must be at least 3 chars (letters, numbers, underscore).');
+      const sessionKey = `tg_${ctx.from.id}_buypanel`;
+      if (!global._pendingTelegram) global._pendingTelegram = {};
+      global._pendingTelegram[sessionKey] = { username, isAdmin: false };
+      await showRamSelection(ctx, sessionKey, username, false);
+      break;
+    }
+    case 'cpanel_username': {
+      const username = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      if (!username || username.length < 3) return ctx.reply('❌ Username must be at least 3 chars.');
+      const sessionKey = `tg_${ctx.from.id}_cpanel`;
+      if (!global._pendingTelegram) global._pendingTelegram = {};
+      global._pendingTelegram[sessionKey] = { username, isAdmin: true };
+      await showRamSelection(ctx, sessionKey, username, false);
+      break;
+    }
+    case 'buyvps_username': {
+      const username = text.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      if (!username || username.length < 3) return ctx.reply('❌ Username must be at least 3 chars.');
+      const sessionKey = `tg_${ctx.from.id}_buyvps`;
+      if (!global._pendingTelegram) global._pendingTelegram = {};
+      global._pendingTelegram[sessionKey] = { username, isAdmin: false, isVps: true };
+      localStates.set(userId, { action: 'buyvps_source', sessionKey });
+      await ctx.reply(
+        '📤 *Choose how to provide your script:*',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📤 Upload my own file', 'buyvps_upload')],
+            [Markup.button.callback('📦 Choose from store', 'buyvps_store')],
+            [Markup.button.callback('⏭️ Skip (deploy default)', 'buyvps_skip')]
+          ])
+        }
+      );
+      break;
+    }
+    case 'buyvps_file': {
+      const sessionKey = state.sessionKey;
+      if (!sessionKey) return ctx.reply('❌ Session expired. Please start again.');
+      const pending = global._pendingTelegram?.[sessionKey];
+      if (!pending) return ctx.reply('❌ Session expired.');
+      if (ctx.message.document) {
+        const file = ctx.message.document;
+        pending.fileId = file.file_id;
+        pending.fileName = file.file_name || 'deploy.zip';
+        pending.fileSource = 'upload';
+        await showVpsRamSelection(ctx, sessionKey, pending.username);
+      } else {
+        return ctx.reply('❌ Please send a document (ZIP file) or press "Skip".');
+      }
+      break;
+    }
+    case 'buyvps_source': {
+      // handled by callbacks
+      break;
+    }
+    case 'clonebot': {
+      const token = text.trim();
+      if (!token || !token.includes(':')) {
+        return ctx.reply('❌ Invalid token format. Please send a valid bot token.');
+      }
+      try {
+        const testBot = new Telegraf(token);
+        const me = await testBot.telegram.getMe();
+        const newBot = new Telegraf(token);
+        setupBot(newBot);
+        clonedBots.set(me.username, {
+          username: me.username,
+          token: token,
+          botInstance: newBot,
+          startTime: Date.now(),
+          isMain: false
+        });
+        newBot.launch().then(() => {
+          ctx.reply(`✅ *New bot @${me.username} is now active!*\nIt has the same features as the original.`, { parse_mode: 'Markdown' });
+        }).catch(err => {
+          ctx.reply(`❌ Failed to launch new bot: ${err.message}`);
+        });
+      } catch (err) {
+        ctx.reply(`❌ Invalid token: ${err.message}`);
+      }
+      break;
+    }
+    case 'pesapal': {
+      const amount = parseFloat(text);
+      if (isNaN(amount) || amount <= 0) return ctx.reply('❌ Invalid amount. Please enter a positive number.');
+      await ctx.telegram.sendMessage(ctx.chat.id, `/pesapal ${amount}`);
+      break;
+    }
+    default:
+      return ctx.reply('❌ Unknown action. Please start again.');
+  }
+  localStates.delete(userId);
+}
+
+// RAM mapping and selection functions
+const ramMap = {
+  '1gb': { ram: 1024, disk: 1024, cpu: 40, price: 1, isAdmin: false },
+  '2gb': { ram: 2048, disk: 2048, cpu: 60, price: 2, isAdmin: false },
+  '3gb': { ram: 3072, disk: 3072, cpu: 80, price: 3, isAdmin: false },
+  '4gb': { ram: 4096, disk: 4096, cpu: 100, price: 4, isAdmin: false },
+  'unlimited': { ram: 0, disk: 0, cpu: 0, price: 8, isAdmin: false },
+  'cpanel': { ram: 1024, disk: 1024, cpu: 40, price: 10, isAdmin: true },
+};
+
+async function showRamSelection(ctx, sessionKey, username, isVps = false) {
+  const ramButtons = [
+    [Markup.button.callback('1GB - $1', 'panel_ram_1gb')],
+    [Markup.button.callback('2GB - $2', 'panel_ram_2gb')],
+    [Markup.button.callback('3GB - $3', 'panel_ram_3gb')],
+    [Markup.button.callback('4GB - $4', 'panel_ram_4gb')],
+    [Markup.button.callback('Unlimited - $8', 'panel_ram_unlimited')],
+    [Markup.button.callback('cPanel - $10', 'panel_ram_cpanel')],
+    [Markup.button.callback('❌ Cancel', 'panel_cancel')],
+  ];
+  await ctx.reply(`🖥️ *${isVps ? 'VPS' : 'Panel'} Purchase*\nUsername: ${username}\nSelect RAM:`, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard(ramButtons),
+  });
+}
+
+async function showVpsRamSelection(ctx, sessionKey, username) {
+  const ramButtons = [
+    [Markup.button.callback('1GB - $5', 'vps_ram_1gb')],
+    [Markup.button.callback('2GB - $10', 'vps_ram_2gb')],
+    [Markup.button.callback('4GB - $20', 'vps_ram_4gb')],
+    [Markup.button.callback('8GB - $40', 'vps_ram_8gb')],
+    [Markup.button.callback('❌ Cancel', 'vps_cancel')],
+  ];
+  await ctx.reply(`🖥️ *VPS Purchase (with script)*\nUsername: ${username}\nSelect RAM:`, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard(ramButtons),
+  });
+}
+
+async function handleTokenChoice(ctx, userId, sessionKey, spec, isVps = false) {
+  const pending = global._pendingTelegram?.[sessionKey];
+  if (!pending) return ctx.reply('❌ Session expired.');
+  const userData = db.users[userId];
+  const tokens = userData?.tokens || 0;
+  const price = spec.price;
+  if (tokens <= 0) {
+    await proceedToPayment(ctx, userId, sessionKey, spec, isVps);
+    return;
+  }
+  const maxDiscount = Math.min(tokens, price);
+  const remaining = price - maxDiscount;
+  await ctx.reply(
+    `💳 *Payment Options*\n\n` +
+    `Price: $${price}\n` +
+    `You have ${tokens} token(s). (1 token = $1 off)\n` +
+    `Max discount: $${maxDiscount}\n` +
+    `If you use all, you pay: $${remaining}\n\n` +
+    `How would you like to proceed?`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback(`Use ${maxDiscount} token(s) – pay $${remaining}`, `token_use_${maxDiscount}_${sessionKey}`)],
+        [Markup.button.callback('Pay full price (save tokens for later)', `token_skip_${sessionKey}`)],
+        [Markup.button.callback('❌ Cancel', 'panel_cancel')]
+      ])
+    }
+  );
+}
+
+async function proceedToPayment(ctx, userId, sessionKey, spec, isVps) {
+  const pending = global._pendingTelegram?.[sessionKey];
+  if (!pending) return ctx.reply('❌ Session expired.');
+  const { username, isAdmin, fileId, fileName } = pending;
+  const amount = spec.price;
+  const reference = `${isVps ? 'VPS' : 'PANEL'}-${userId}-${Date.now()}`;
+  const email = `${userId}@telegram.bot`;
+  const metadata = {
+    user_id: userId,
+    username,
+    ram: spec.ram,
+    disk: spec.disk || 0,
+    cpu: spec.cpu || 0,
+    price: amount,
+    isAdmin: isAdmin || false,
+    fileId: fileId || null,
+    fileName: fileName || null,
+    isVps: isVps || false,
+    type: isVps ? 'vps_with_script' : 'panel',
+  };
+  const init = await initPaystackPayment(amount, email, reference, metadata);
+  if (!init || !init.status) {
+    return ctx.reply('❌ Payment initialization failed. Please try again.');
+  }
+  const paymentUrl = init.data.authorization_url;
+  pendingPayments.set(reference, {
+    userId,
+    username,
+    ram: spec.ram,
+    disk: spec.disk || 0,
+    cpu: spec.cpu || 0,
+    price: amount,
+    isAdmin: isAdmin || false,
+    fileId: fileId || null,
+    fileName: fileName || null,
+    isVps: isVps || false,
+    status: 'pending',
+  });
+  const typeLabel = isVps ? 'VPS + Script' : (isAdmin ? '👑 CPANEL' : '📦 ' + (spec.ram === 0 ? 'Unlimited' : `${spec.disk/1024}GB`) + ' Panel');
+  await ctx.reply(
+    `💳 *Complete Your Payment*\n\n` +
+    `Type: ${typeLabel}\n` +
+    `Username: ${username}\n` +
+    `📊 RAM: ${spec.ram === 0 ? 'Unlimited' : spec.ram + 'MB'}\n` +
+    `💰 Price: $${amount}\n\n` +
+    `🔗 [Pay Now](${paymentUrl})\n\n` +
+    `After paying, tap *Verify Payment* below.`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('✅ Verify Payment', `verify_panel_payment_${reference}`)],
+      ])
+    }
+  );
+}
+
+async function verifyAndCreatePanel(ctx, reference, pending) {
+  if (pending.status === 'success') return ctx.reply('✅ Already verified.');
+  await ctx.reply('⏳ Verifying payment...');
+  const verify = await verifyPaystackPayment(reference);
+  if (!verify || !verify.status) return ctx.reply('❌ Verification failed. Try again.');
+  if (verify.data.status === 'success') {
+    pending.status = 'success';
+    const { username, ram, disk, cpu, isAdmin, fileId, fileName, isVps } = pending;
+    try {
+      if (isVps) {
+        const password = 'VPS' + Math.floor(Math.random() * 9999).toString();
+        const size = ram <= 1024 ? 's-1vcpu-1gb' : ram <= 2048 ? 's-1vcpu-2gb' : ram <= 4096 ? 's-2vcpu-4gb' : 's-4vcpu-8gb';
+        const dropletId = await createVPSDroplet(settings.apiDigitalOcean, username, size, 'ubuntu22', 'sgp1', password);
+        let ip = null;
+        while (!ip) {
+          await sleep(3000);
+          const droplet = await getDropletInfo(settings.apiDigitalOcean, dropletId);
+          ip = droplet?.networks?.v4?.find(n => n.type === 'public')?.ip_address;
+        }
+        let deployResult = { path: '/root' };
+        if (fileId) {
+          deployResult = await deployFileToVPS(ip, password, fileId, fileName, ctx.telegram);
+        }
+        await ctx.reply(
+          `✅ *VPS Created & Script Deployed!*\n\n` +
+          `🌐 IP: \`${ip}\`\n🔑 SSH Password: \`${password}\`\n📁 Project Path: ${deployResult.path}\n\n` +
+          `Your script is running with PM2.\n` +
+          `Commands:\n` +
+          `• SSH: ssh root@${ip}\n` +
+          `• View logs: pm2 logs\n` +
+          `• Restart: pm2 restart mybot\n\n` +
+          `⚠️ Save these credentials!`,
+          { parse_mode: 'Markdown' }
+        );
+      } else {
+        const panelResult = await createPterodactylPanel(username, ram, disk, cpu, isAdmin || false);
+        const typeLabel = isAdmin ? '👑 CPANEL' : '📦 ' + (ram === 0 ? 'Unlimited' : `${disk/1024}GB`) + ' Panel';
+        await ctx.reply(
+          `✅ *Panel Created Successfully!*\n\n` +
+          `Type: ${typeLabel}\n` +
+          `👤 Username: ${panelResult.username}\n` +
+          `🔑 Password: ${panelResult.password}\n` +
+          `📊 RAM: ${panelResult.ram === 0 ? 'Unlimited' : panelResult.ram + 'MB'}\n` +
+          `💾 Disk: ${panelResult.disk === 0 ? 'Unlimited' : panelResult.disk + 'MB'}\n` +
+          `⚡ CPU: ${panelResult.cpu === 0 ? 'Unlimited' : panelResult.cpu + '%'}\n` +
+          `🔗 Login: ${panelResult.panelDomain}\n\n` +
+          `⚠️ Save these credentials!`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+      pendingPayments.delete(reference);
+    } catch (e) {
+      await ctx.reply(`❌ Creation failed: ${e.message}`);
+    }
+  } else {
+    await ctx.reply(`⏳ Payment status: *${verify.data.status}*. Complete payment first.`, { parse_mode: 'Markdown' });
+  }
+}
+
+async function createCustomBot(name) {
+  const templatePath = './templates/bot-template.zip';
+  if (!fs.existsSync(templatePath)) {
+    throw new Error('Bot template not found. Please ask the owner to upload it.');
+  }
+  const tempDir = path.join(__dirname, 'temp', `bot_${Date.now()}`);
+  ensureDir(tempDir);
+  const zip = new AdmZip(templatePath);
+  zip.extractAllTo(tempDir, true);
+  const settingsPath = path.join(tempDir, 'settings.js');
+  if (fs.existsSync(settingsPath)) {
+    let content = fs.readFileSync(settingsPath, 'utf8');
+    content = content.replace(/Samsung XMD/g, name);
+    content = content.replace(/samsung-md-bot/g, name.toLowerCase().replace(/\s+/g, '-'));
+    fs.writeFileSync(settingsPath, content);
+  }
+  const pkgPath = path.join(tempDir, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    pkg.name = name.toLowerCase().replace(/\s+/g, '-');
+    pkg.description = `${name} - WhatsApp Bot`;
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+  }
+  const newZip = new AdmZip();
+  newZip.addLocalFolder(tempDir);
+  const zipBuffer = newZip.toBuffer();
+  fs.rmSync(tempDir, { recursive: true, force: true });
+  return zipBuffer;
 }
 
 // ─────────────────────────────────────────────────────────────
-//   LAUNCH
+//   RELOAD & LAUNCH
 // ─────────────────────────────────────────────────────────────
 
-async function launch() {
-  // ── Giant Banner ──
-  process.stdout.write(chalk.magentaBright(`
-⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⢛⡛⠿⠛⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⣿⣿⡿⠟⡉⣡⡖⠘⢗⣀⣀⡀⢢⣐⣤⣉⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⡿⠉⣠⣲⣾⡭⣀⢟⣩⣶⣶⡦⠈⣿⣿⣿⣷⣖⠍⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⡛⢀⠚⢩⠍⠀⠀⠡⠾⠿⣋⡥⠀⣤⠈⢷⠹⣿⣎⢳⣶⡘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⡏⢀⡤⠉⠀⠀⠀⣴⠆⠠⠾⠋⠁⣼⡿⢰⣸⣇⢿⣿⡎⣿⡷⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⠀⢸⢧⠁⠀⠀⢸⠇⢐⣂⣠⡴⠶⣮⢡⣿⢃⡟⡘⣿⣿⢸⣷⡀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣯⢀⡏⡾⢠⣿⣶⠏⣦⢀⠈⠉⡙⢻⡏⣾⡏⣼⠇⢳⣿⡇⣼⡿⡁⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⠈⡇⡇⡘⢏⡃⠀⢿⣶⣾⣷⣿⣿⣿⡘⡸⠇⠌⣾⢏⡼⣿⠇⠀⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⡀⠀⢇⠃⢢⡙⣜⣾⣿⣿⣿⣿⣿⣿⣧⣦⣄⡚⣡⡾⣣⠏⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣷⡀⡀⠃⠸⣧⠘⢿⣿⣿⣿⣿⣿⣻⣿⣿⣿⣿⠃⠘⠁⢈⣤⡀⣬⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣇⣅⠀⠀⠸⠀⣦⡙⢿⣿⣿⣿⣿⣿⣿⡿⠃⢀⣴⣿⣿⣿⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⡿⢛⣉⣉⣀⡀⠀⢸⣿⣿⣷⣬⣛⠛⢛⣩⣵⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⢋⣴⣿⣿⣿⣿⣿⣦⣬⣛⣻⠿⢿⣿⡇⠈⠙⢛⣛⣩⣭⣭⣝⡛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⡇⣼⣿⣿⣿⣿⣿⡿⡹⢿⣿⣽⣭⣭⣭⣄⣙⠻⢿⣿⡿⣝⣛⣛⡻⢆⠙⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⢥⣿⣿⣿⣿⣿⣿⢇⣴⣿⣿⣿⣿⣿⡿⣿⣿⣿⣷⣌⢻⣿⣿⣿⣿⣿⣷⣶⣌⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿
-⡆⣿⣿⣿⣿⣿⡟⣸⣿⣿⣿⣿⣿⣿⣄⣸⣿⣿⣿⣿⣦⢻⣿⣿⣿⣿⣿⣿⣿⠁⠊⠻⣿⣿⣿⣿⣿⣿⣿
-⣿⠸⣿⣿⣿⣿⡇⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢸⣿⣿⣿⣿⣿⣿⣿⣷⣿⠀⣿⣿⣿⣿⣿⣿⣿
-⣿⣄⢻⣿⣿⣿⣿⡸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠸⣿⣿⣿⣿⣿⣿⣿⣿⣿⢀⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⠈⣿⣿⣿⣿⣷⢙⠿⣿⣿⣿⣿⣿⣿⣿⠿⣟⣩⣴⣷⣌⠻⣿⣿⣿⣿⣿⣿⡟⢠⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣆⢻⣿⣿⣿⣿⡇⣷⣶⣭⣭⣭⣵⣶⣾⣿⣿⣿⣿⣿⣿⣷⣌⠹⢿⣿⡿⢋⣠⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⡚⣿⣿⣿⣿⡇⢹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢀⣤⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⡇⢻⣿⣿⣿⡇⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⣿⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣷⠈⣿⣿⣿⣿⢆⠀⢋⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣿⣿⣥⡘⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⠀⣻⣿⣿⣿⠀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣎⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣒⣻⣿⣿⢏⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣄⢻⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣇⢹⣿⡏⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟⣿⣿⣿⣿⣿⣷⣬⡻⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⡄⠻⢱⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣝⢎⢻⣿⣿⣿
-⣿⣿⣿⣿⣿⣷⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⣿⣿⣾⣦⢻⣿⣿
-⣿⣿⣿⣿⣿⡇⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⣼⣿⣿⣿⣿⣆⢻⣿
-⣿⣿⣿⣿⡿⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣮⡙⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⣰⣿⣿⣿⣿⣿⣿⣆⣿
-⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣝⢿⣿⣿⣿⣿⣿⣿⣿⢡⣿⣿⣿⣿⣿⣿⣿⣿⡎
-⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣝⢿⣿⡆⢿⣿⡿⢸⣿⣿⣿⣿⣿⣿⣿⣿⡇
-⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⢻⣿⢸⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷
-⣿⣿⣿⣿⣧⢹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⢹⠸⠁⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⡌⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⢰⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⣷⡘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡌⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀`));
-
-  global._startWhatsApp = (...args) => startWhatsApp(...args);
-
-  const mainBot = new Telegraf(settings.TELEGRAM_TOKEN);
-  global._mainBotInstance = mainBot;
-  setupBot(mainBot, { isMain: true });
-
-  logInfo('PREMIUM', `Mode: ${premData.premOnly ? 'Premium-only' : 'Public'} | Owners: ${[settings.OWNER_TELEGRAM_ID, ...premData.owners].length} | Prem users: ${premData.premUsers.length}`);
-  logInfo('REPLIES', `Loaded ${pendingReplies.size} pending reply(ies) from disk`);
-  logInfo('PAYSTACK', PAYSTACK_SECRET ? '✅ Paystack configured' : '❌ Paystack secret missing');
-  logInfo('PANEL', PANEL_DOMAIN ? `✅ Panel domain: ${PANEL_DOMAIN}` : '❌ Panel domain missing');
-
-  startPingLoop();
-  startSessionWatcher();
-
-  // ── Reload existing sessions ──
+async function reloadSessions() {
   await syncSessionsFromGitHub();
   const list = listSessions();
   logInfo('STARTUP', `Reloading ${list.length} session(s)`);
@@ -4188,6 +3601,46 @@ async function launch() {
     notifiedConnected.add(sid);
     setTimeout(() => startWhatsApp(sid, null, null, tgUserId).catch(e => logError(sid, e.message)), i * 1200);
   });
+}
+
+async function launch() {
+  // Banner (your existing banner)
+  process.stdout.write(chalk.magentaBright(`...`)); // your banner
+
+  global._startWhatsApp = (...args) => startWhatsApp(...args);
+
+  // ── Start Telegram bot ──
+  const mainBot = new Telegraf(settings.TELEGRAM_TOKEN);
+  global._mainBotInstance = mainBot;
+  setupBot(mainBot);
+  const mainUsername = (await mainBot.telegram.getMe()).username;
+  clonedBots.set(mainUsername, {
+    username: mainUsername,
+    token: settings.TELEGRAM_TOKEN,
+    botInstance: mainBot,
+    startTime: Date.now(),
+    isMain: true
+  });
+
+  logInfo('PREMIUM', `Mode: ${premData.premOnly ? 'Premium-only' : 'Public'} | Owners: ${[settings.OWNER_TELEGRAM_ID, ...premData.owners].length} | Prem users: ${premData.premUsers.length}`);
+  logInfo('REPLIES', `Loaded ${pendingReplies.size} pending reply(ies) from disk`);
+  logInfo('PAYSTACK', PAYSTACK_SECRET ? '✅ Paystack configured' : '❌ Paystack secret missing');
+  logInfo('PANEL', PANEL_DOMAIN ? `✅ Panel domain: ${PANEL_DOMAIN}` : '❌ Panel domain missing');
+
+  startPingLoop();
+  startSessionWatcher();
+  await reloadSessions();
+
+  // ── Start both WhatsApp bots ──
+  global.botSockets = new Map();
+
+  // Start Samsung
+  const samsungSocket = await startWhatsApp('wa_samsung_main', null, null, null);
+  global.botSockets.set('samsung', samsungSocket);
+
+  // Start FBI (imported from modified fbi/index.js)
+  const fbiSocket = await fbiBot.startXeonBotInc(); // Ensure FBI uses separate session folder
+  global.botSockets.set('fbi', fbiSocket);
 
   mainBot.launch({ dropPendingUpdates: true });
   logSuccess('TELEGRAM', 'Bot running');
